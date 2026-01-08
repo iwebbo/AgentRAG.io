@@ -103,12 +103,10 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 ## 🖼️ Demo
 
 ### 1. Agent Dashboard
-![Agent Dashboard](https://github.com/user-attachments/assets/agent-dashboard.png)
-*Create and manage autonomous agents with custom workflows*
+<img width="1899" height="905" alt="image" src="https://github.com/user-attachments/assets/f51b43b5-cb34-4273-a60b-f2c8cb33592f" />
 
 ### 2. Code Generator Agent in Action
-![Code Generator](https://github.com/user-attachments/assets/code-generator-agent.png)
-*Real-time code generation with RAG context, auto-testing, and GitHub integration*
+<img width="1901" height="905" alt="image" src="https://github.com/user-attachments/assets/75aa902e-be76-4fab-84dc-224215ac045c" />
 
 ### 3. RAG Chat Interface (Original RAG.io)
 <img width="1719" height="911" alt="Capture d&#39;écran 2025-12-05 235210" src="https://github.com/user-attachments/assets/01661270-926b-4409-8c18-757d0210c835" />
