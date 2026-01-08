@@ -33,7 +33,7 @@
 
 AgentRAG.io extends RAG.io with **autonomous MCP agents** that combine RAG intelligence with external tool execution. Built for enterprises and developers who need:
 
-- **🤖 Autonomous Agents**: Code generation, branch review, legal advisory, accounting automation
+- **🤖 Autonomous Agents**: Code generation, branch review, legal advisory, accounting automation, Email management
 - **🔍 RAG-Powered Intelligence**: Agents leverage your document knowledge base for context-aware decisions
 - **🔌 MCP Integration**: Seamless connection to GitHub, Jira, Slack, testing frameworks, linters, and more
 - **⚡ Real-Time Streaming**: Progressive agent execution with live logs and status updates
@@ -137,6 +137,9 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 | **Branch Code Review** | Automated PR review with suggestions | GitHub | Coding standards |
 | **Legal Advisor** | Contract analysis, compliance checks | Document storage | Legal database |
 | **Accounting Advisor** | Financial analysis, invoice processing | ERP systems | Accounting rules |
+| **Web Search** | A sample Agent of Web Search
+| **Travel Epert** | Managemenent, analysis, planned your Travel 
+| **Email Epert** | analysis, send email with LLM
 | *(Custom)* | Build your own specialized agent | Any MCP server | Any project |
 
 ### Core RAG Features (from RAG.io)
@@ -171,45 +174,6 @@ All the RAG.io features remain unchanged:
 
 ---
 
-## 🏗️ Agent Architecture
-
-### Agent Execution Flow
-
-```python
-# 1. Agent Initialization
-agent = CodeGeneratorAgent(
-    agent_id=uuid4(),
-    user_id=user.id,
-    config={
-        "project_id": project.id,          # RAG project for context
-        "mcp_servers": ["github", "linter", "test_runner"],
-        "repo": "myorg/myrepo",
-        "auto_test": True,
-        "auto_commit": True
-    },
-    mcp_config={
-        "github": {"token": "ghp_..."},
-    },
-    db=db_session
-)
-
-# 2. Execute Agent (async generator for streaming)
-async for update in agent.execute(input_data={
-    "prompt": "Add OAuth2 authentication",
-    "target_files": ["backend/auth.py"]
-}):
-    # update = {"type": "log|progress|result", "data": {...}}
-    print(update)
-
-# 3. Agent automatically:
-#    a. Fetches RAG context from project documents
-#    b. Calls GitHub MCP to clone repo
-#    c. Generates code via LLM with context
-#    d. Runs tests via Test Runner MCP
-#    e. Lints code via Linter MCP
-#    f. Commits and pushes via GitHub MCP
-#    g. Creates PR (if configured)
-```
 
 ## 🤖 Available Agents
 
