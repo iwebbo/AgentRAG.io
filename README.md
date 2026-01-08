@@ -442,11 +442,15 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 # 3.1 Edit backend/.env if (need to be run from VM/PROD Server)
 # Change by your hostname.fqdn or IP
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost,http://localhost:80
-# Change by your hostname.fqdn or IP
 
 # 3.1 Edit frontend/.env if (need to be run from VM/PROD Server)
 # Change by your hostname.fqdn or IP
 VITE_API_URL=http://localhost:8000 
+
+# Will be solve in 1.1.0
+cd backend/
+mkdir -p /app/data/chromadb
+chmod -R 777 /app/data
 
 # 4. Start application
 docker-compose up -d
