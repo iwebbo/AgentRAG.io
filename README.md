@@ -108,10 +108,16 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 ### 2. Code Generator Agent in Action
 <img width="1901" height="905" alt="image" src="https://github.com/user-attachments/assets/75aa902e-be76-4fab-84dc-224215ac045c" />
 
-### 3. RAG Chat Interface (Original RAG.io)
+### 3. Code Generator Agent in Action Commit & Create new Branch.
+<img width="1896" height="906" alt="image" src="https://github.com/user-attachments/assets/22d89d1f-7a1f-41f8-9713-59c8e0b94bf3" />
+
+### 4. Code Review Agent in Action Pull request of Review.
+<img width="1918" height="850" alt="image" src="https://github.com/user-attachments/assets/1a7d26ea-8fa4-4bcb-af5d-36b19dc2a79b" />
+
+### 5. RAG Chat Interface (Original RAG.io)
 <img width="1719" height="911" alt="Capture d&#39;écran 2025-12-05 235210" src="https://github.com/user-attachments/assets/01661270-926b-4409-8c18-757d0210c835" />
 
-### 4. Document Upload & Processing
+### 6. Document Upload & Processing
 <img width="1702" height="905" alt="Capture d&#39;écran 2025-12-05 235411" src="https://github.com/user-attachments/assets/20666ce0-59f0-4a94-aab9-1b9b0448c7d1" />
 
 ---
