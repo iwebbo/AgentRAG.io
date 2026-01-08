@@ -1,4 +1,4 @@
-<img width="600" height="600" alt="logo" src="https://github.com/user-attachments/assets/5d61c808-1c8e-4e35-9718-2ff0663c5360" />
+<img width="600" height="600" alt="agentragio" src="https://github.com/user-attachments/assets/93dfaf79-24a1-439b-9c63-724917a30554" />
 
 # AgentRAG.io - Intelligent RAG with Autonomous Agents
 
