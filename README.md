@@ -10,7 +10,7 @@
 ![React](https://img.shields.io/badge/React-4EAA25?style=for-the-badge&logo=React&logoColor=black)
 ![Docker](https://img.shields.io/badge/Docker-0078D6?style=for-the-badge&logo=Docker&logoColor=black)
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#-overview)
 - [What's New: MCP Agents](#-whats-new-mcp-agents)
@@ -29,16 +29,16 @@
 
 ---
 
-## 🎯 Overview
+## Overview
 
 AgentRAG.io extends RAG.io with **autonomous MCP agents** that combine RAG intelligence with external tool execution. Built for enterprises and developers who need:
 
-- **🤖 Autonomous Agents**: Code generation, branch review, legal advisory, accounting automation, Email management
-- **🔍 RAG-Powered Intelligence**: Agents leverage your document knowledge base for context-aware decisions
-- **🔌 MCP Integration**: Seamless connection to GitHub, Jira, Slack, testing frameworks, linters, and more
-- **⚡ Real-Time Streaming**: Progressive agent execution with live logs and status updates
-- **🎛️ Fine-Grained Control**: Configure agent behavior, timeouts, retries, and MCP server access
-- **📚 Project-Based Organization**: Isolate documents, conversations, and agent workflows by project
+- **Autonomous Agents**: Code generation, branch review, legal advisory, accounting automation, Email management
+- **RAG-Powered Intelligence**: Agents leverage your document knowledge base for context-aware decisions
+- **MCP Integration**: Seamless connection to GitHub, Jira, Slack, testing frameworks, linters, and more
+- **Real-Time Streaming**: Progressive agent execution with live logs and status updates
+- **Fine-Grained Control**: Configure agent behavior, timeouts, retries, and MCP server access
+- **Project-Based Organization**: Isolate documents, conversations, and agent workflows by project
 
 ### Core Platform Features (from RAG.io)
 
@@ -51,11 +51,11 @@ All the powerful RAG features you know and love:
 
 ---
 
-## 🆕 What's New: MCP Agents
+## What's New: MCP Agents
 
 AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intelligence:
 
-### 🤖 Agent Architecture
+### Agent Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -87,7 +87,7 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 🎯 Key Differentiators
+### Key Differentiators
 
 | Feature | Traditional RAG | AgentRAG.io |
 |---------|----------------|--------------|
@@ -100,7 +100,7 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 
 ---
 
-## 🖼️ Demo
+## Demo
 
 ### 1. Agent Dashboard
 <img width="1899" height="905" alt="image" src="https://github.com/user-attachments/assets/f51b43b5-cb34-4273-a60b-f2c8cb33592f" />
@@ -122,9 +122,9 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 
 ---
 
-## ✨ Features
+## Features
 
-### 🤖 Autonomous Agents (NEW)
+### Autonomous Agents (NEW)
 
 #### **Agent Capabilities**
 - **RAG-Powered Context**: Agents automatically retrieve relevant context from your document knowledge base
@@ -152,21 +152,21 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 
 All the RAG.io features remain unchanged:
 
-#### 📄 **Document Processing**
+#### **Document Processing**
 - **Supported Formats**: PDF, DOCX, TXT, MD, HTML, CSV, JSON (50+ file types)
 - **Smart Chunking**: Adaptive chunk size (100-2000 tokens) with configurable overlap
 - **Metadata Extraction**: Automatic filename, page number, and document type tagging
 - **Token Tracking**: Real-time token counting for cost estimation
 - **Batch Processing**: Background async processing with progress tracking
 
-#### 🔍 **Semantic Search**
+#### **Semantic Search**
 - **Vector Database**: ChromaDB with HNSW indexing
 - **Embedding Models**: sentence-transformers/all-MiniLM-L6-v2 (default), OpenAI embeddings
 - **Adjustable top-k**: Dynamic retrieval (1-20 chunks) based on model context
 - **Distance Scoring**: Cosine similarity with configurable threshold
 - **Metadata Filtering**: Filter by document type, date, or custom tags
 
-#### 🤖 **Multi-Provider LLM Support**
+#### **Multi-Provider LLM Support**
 
 | Provider | Models | Context Window | Streaming | Temperature |
 |----------|--------|----------------|-----------|-------------|
@@ -181,7 +181,7 @@ All the RAG.io features remain unchanged:
 ---
 
 
-## 🤖 Available Agents
+## Available Agents
 
 ### 1. Code Generator Agent
 
@@ -343,7 +343,7 @@ All the RAG.io features remain unchanged:
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend (unchanged from RAG.io)
 - **Framework**: FastAPI 0.104+ (async, type-safe)
@@ -377,7 +377,7 @@ All the RAG.io features remain unchanged:
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 
@@ -479,52 +479,10 @@ npm run dev
 
 ---
 
-## ⚙️ Configuration
-
-### Agent Configuration (UI)
-
-Navigate to **Agents → Create Agent** to configure:
-
-**Code Generator Agent**:
-```json
-{
-  "name": "Code Generator",
-  "type": "code_generator",
-  "project_id": "uuid",
-  "mcp_servers": ["github", "test_runner", "linter"],
-  "config": {
-    "repo": "myorg/myrepo",
-    "auto_test": true,
-    "auto_lint": true,
-    "auto_commit": true
-  },
-  "mcp_config": {
-    "github": {
-      "token": "ghp_...",
-      "repo": "myorg/myrepo"
-    }
-  }
-}
+## API Documentation
+```bash
+API Docs: http://localhost:8000/docs
 ```
-
-**Branch Review Agent**:
-```json
-{
-  "name": "PR Reviewer",
-  "type": "branch_code_review",
-  "project_id": "uuid",
-  "mcp_servers": ["github"],
-  "config": {
-    "repo": "myorg/myrepo",
-    "review_style": "constructive",
-    "auto_approve": false
-  }
-}
-```
-
----
-
-## 📚 API Documentation
 
 ### Agent API (NEW)
 
@@ -630,22 +588,11 @@ Response:
   "completed_at": "2024-01-15T14:35:00Z"
 }
 ```
-
-### RAG & Project APIs (unchanged)
-
-All existing RAG.io APIs remain unchanged:
-- `/api/rag/chat/stream` - RAG chat with streaming
-- `/api/projects/` - Project management
-- `/api/documents/` - Document upload and management
-- `/api/providers/` - LLM provider configuration
-
-See full API documentation at `http://localhost:8000/docs`
-
 ---
 
-## 💡 Usage Guide
+## Usage Guide
 
-### 1. Create Your First Agent
+### Create Your First Agent
 
 ```bash
 # Via UI: Agents → New Agent → Code Generator
@@ -662,51 +609,7 @@ curl -X POST http://localhost:8000/api/agents/ \
   }'
 ```
 
-### 2. Execute Agent
-
-```javascript
-// Frontend example (React)
-const executeAgent = async (agentId, inputData) => {
-  const response = await fetch(`/api/agents/${agentId}/execute/stream`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ input_data: inputData })
-  });
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('event:')) {
-        const eventType = line.substring(6).trim();
-        const dataLine = lines[lines.indexOf(line) + 1];
-        const data = JSON.parse(dataLine.substring(6));
-        
-        console.log(`[${eventType}]`, data);
-        // Update UI with live logs/progress
-      }
-    }
-  }
-};
-
-// Execute code generator
-await executeAgent('agent-uuid', {
-  prompt: 'Add OAuth2 authentication',
-  target_files: ['backend/auth.py']
-});
-```
-
-### 3. Monitor Agent Execution
+### Monitor Agent Execution
 
 Check **Agents → Executions** for:
 - Real-time execution logs
@@ -717,7 +620,7 @@ Check **Agents → Executions** for:
 
 ---
 
-## 🔧 Development
+## Development
 
 ### Adding a Custom Agent
 
@@ -794,19 +697,6 @@ class MyCustomMCPServer:
             response.raise_for_status()
             return response.json()
 ```
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-**Areas for contribution:**
-- New agent types (HR, DevOps, Marketing, etc.)
-- Additional MCP servers (GitLab, Bitbucket, Confluence, etc.)
-- UI improvements for agent management
-- Performance optimizations
-- Documentation and examples
 
 ---
 
