@@ -19,6 +19,7 @@ services:
       retries: 5
     networks:
       - ragio-network
+    restart: always
 
   backend:
     build:
@@ -38,7 +39,7 @@ services:
       - ./backend:/app
     networks:
       - ragio-network
-    restart: unless-stopped
+    restart: always
 
   frontend:
     build:
@@ -53,7 +54,7 @@ services:
       - backend
     networks:
       - ragio-network
-    restart: unless-stopped
+    restart: always
 
 volumes:
   postgres_data:
