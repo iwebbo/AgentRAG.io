@@ -39,27 +39,27 @@ jobs:
 
     - name: Update Chart.yaml
       run: |
-        sed -i "s/version: .*/version: ${{ steps.version.outputs.version }}/" charts/RAG.io/Chart.yaml
-        sed -i "s/appVersion: .*/appVersion: \"${{ steps.version.outputs.version }}\"/" charts/RAG.io/Chart.yaml
-        sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/RAG.io/Chart.yaml
-        sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/RAG.io/values.yaml
-        cat charts/RAG.io/Chart.yaml
+        sed -i "s/version: .*/version: ${{ steps.version.outputs.version }}/" charts/AgentRAG.io/Chart.yaml
+        sed -i "s/appVersion: .*/appVersion: \"${{ steps.version.outputs.version }}\"/" charts/AgentRAG.io/Chart.yaml
+        sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/AgentRAG.io/Chart.yaml
+        sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/AgentRAG.io/values.yaml
+        cat charts/AgentRAG.io/Chart.yaml
 
     - name: Lint Helm chart
-      run: helm lint charts/RAG.io
+      run: helm lint charts/AgentRAG.io
 
     - name: Package Helm chart
       run: |
         mkdir -p charts
-        helm package charts/RAG.io -d charts/
+        helm package charts/AgentRAG.io -d charts/
         ls -lah charts/
 
     - name: Create Helm index
       run: |
         if [ -f charts/index.yaml ]; then
-          helm repo index charts/ --url https://${{ github.repository_owner }}.github.io/RAG.io/ --merge charts/index.yaml
+          helm repo index charts/ --url https://${{ github.repository_owner }}.github.io/AgentRAG.io/ --merge charts/index.yaml
         else
-          helm repo index charts/ --url https://${{ github.repository_owner }}.github.io/RAG.io/
+          helm repo index charts/ --url https://${{ github.repository_owner }}.github.io/AgentRAG.io/
         fi
         cat charts/index.yaml
 
@@ -68,18 +68,18 @@ jobs:
         cat > charts/README.md << 'EOF'
         # RAG Multi-Expert Helm Charts
         
-        Kubernetes deployment chart for RAG Multi-Expert System (Backend + Frontend + PostgreSQL + ChromaDB).
+        Kubernetes deployment chart for AgentRAG.io - Intelligent RAG with Autonomous Agents.
         
         ## Add Repository
         ```bash
-        helm repo add rag https://${{ github.repository_owner }}.github.io/RAG.io/
+        helm repo add rag https://${{ github.repository_owner }}.github.io/AgentRAG.io/
         helm repo update
         ```
         
         ## Install Chart
         ```bash
-        helm upgrade --install rag rag/rag-multi-expert \
-          --namespace rag \
+        helm upgrade --install agentragio agentragio/agentragio \
+          --namespace agentragio \
           --create-namespace \
           -f values.yml
           ```
@@ -101,7 +101,7 @@ jobs:
           enabled: true
           name: backend
           image:
-            repository: ghcr.io/iwebbo/RAG.io/backend
+            repository: ghcr.io/iwebbo/AgentRAG.io/backend
             tag: "latest"
             pullPolicy: IfNotPresent
           
@@ -131,7 +131,7 @@ jobs:
           enabled: true
           name: frontend
           image:
-            repository: ghcr.io/iwebbo/RAG.io/frontend
+            repository: ghcr.io/iwebbo/AgentRAG.io/frontend
             tag: "latest"
             pullPolicy: IfNotPresent
           
@@ -236,6 +236,14 @@ jobs:
             OLLAMA_URL: "http://ollama.default.svc.cluster.local:11434"
             OPENAI_API_KEY: ""
             ANTHROPIC_API_KEY: ""
+            # Feature/opeansearchadd
+            OPENSEARCH_HOST: "opensearch.domain.local"
+            OPENSEARCH_PORT: "9200"
+            OPENSEARCH_USER: "admin"
+            OPENSEARCH_PASSWORD: "admin"
+            OPENSEARCH_USE_SSL: "true"
+            OPENSEARCH_VERIFY_CERTS: "false"
+            OPENSEARCH_EMBEDDING_DIM: "384"
 
         # Ingress configuration
         ingress:
@@ -455,19 +463,19 @@ jobs:
         ## Verification
         ```bash
         # List charts
-        helm search repo rag
+        helm search repo agentragio
         
         # Get values
-        helm show values rag/rag-multi-expert
+        helm show values agentragio/agentragio
         
         # Dry run
-        helm install rag rag/rag-multi-expert --dry-run --debug
+        helm install agentragio agentragio/agentragio --dry-run --debug
         
         # Check deployments
-        kubectl get pods -n rag
-        kubectl get svc -n rag
-        kubectl get pvc -n rag
-        kubectl get ingress -n rag
+        kubectl get pods -n agentragio
+        kubectl get svc -n agentragio
+        kubectl get pvc -n agentragio
+        kubectl get ingress -n agentragio
         ```
 
         ## LLM Configuration
@@ -476,16 +484,6 @@ jobs:
         - Ollama (local)
         - OpenAI API
         - Anthropic Claude API
-
-        Set API keys in the application settings or override secrets in `values.yml`.
-
-        ## Domain Experts
-
-        The system includes 4 domain experts configurable via UI:
-        - 🔧 DevOps Expert
-        - ⚖️ Legal Expert
-        - 👥 HR Expert
-        - 💰 Finance Expert
 
         Documents for each domain should be uploaded via the web interface.
         EOF
@@ -522,15 +520,15 @@ jobs:
         echo "✅ **Chart Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📍 Repository URL" >> $GITHUB_STEP_SUMMARY
-        echo "https://${{ github.repository_owner }}.github.io/RAG.io/" >> $GITHUB_STEP_SUMMARY
+        echo "https://${{ github.repository_owner }}.github.io/AgentRAG.io/" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📥 Add Repository" >> $GITHUB_STEP_SUMMARY
         echo '```bash' >> $GITHUB_STEP_SUMMARY
-        echo "helm repo add rag https://${{ github.repository_owner }}.github.io/RAG.io/" >> $GITHUB_STEP_SUMMARY
+        echo "helm repo add agentragio https://${{ github.repository_owner }}.github.io/AgentRAG.io/" >> $GITHUB_STEP_SUMMARY
         echo "helm repo update" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🚀 Install" >> $GITHUB_STEP_SUMMARY
         echo '```bash' >> $GITHUB_STEP_SUMMARY
-        echo "helm install rag rag/rag-multi-expert -n rag --create-namespace -f values.yml" >> $GITHUB_STEP_SUMMARY
+        echo "helm install agentragio agentragio/agentragio -n agentragio --create-namespace -f values.yml" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
