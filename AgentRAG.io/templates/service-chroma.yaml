@@ -1,0 +1,19 @@
+{{- if .Values.chroma.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rag.name" . }}-chroma
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chroma
+spec:
+  type: {{ .Values.chroma.service.type }}
+  ports:
+    - port: {{ .Values.chroma.service.port }}
+      targetPort: {{ .Values.chroma.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "rag.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: chroma
+{{- end }}

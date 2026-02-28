@@ -1,0 +1,15 @@
+{{- if .Values.documents.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "rag.name" . }}-documents-pvc
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.documents.storage.className }}
+  resources:
+    requests:
+      storage: {{ .Values.documents.storage.size }}
+{{- end }}

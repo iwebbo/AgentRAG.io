@@ -1,0 +1,194 @@
+###A revoir adapter repo GITEA + name rag.io to agentrag et les autres vars en bas.
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+registry: ghcr.io
+imagePullSecrets: []
+
+# Backend FastAPI
+backend:
+  enabled: true
+  name: backend
+  image:
+    repository: ghcr.io/iwebbo/AgentRAG.io/backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  env:
+    - name: LOG_LEVEL
+      value: "INFO"
+    - name: WORKERS
+      value: "4"
+
+# Frontend Vue 3
+frontend:
+  enabled: true
+  name: frontend
+  image:
+    repository: ghcr.io/iwebbo/AgentRAG.io/frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# PostgreSQL
+postgres:
+  enabled: true
+  name: postgres
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 5432
+    targetPort: 5432
+  storage:
+    enabled: true
+    className: "standard"
+    size: 10Gi
+    mountPath: /var/lib/postgresql/data
+    subPath: postgres
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  database: rag_db
+  user: raguser
+  password: "changeMeRag123!"
+
+# ChromaDB Vector Store
+chroma:
+  enabled: true
+  name: chroma
+  image:
+    repository: chromadb/chroma
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8000
+  storage:
+    enabled: true
+    className: "standard"
+    size: 20Gi
+    mountPath: /data/chroma
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+# Shared document storage
+documents:
+  storage:
+    enabled: true
+    className: "standard"
+    size: 50Gi
+    mountPath: /app/data/documents
+
+# Secrets
+secrets:
+  create: true
+  name: rag-secrets
+  data:
+    # Database
+    DATABASE_URL: "postgresql://raguser:changeMeRag123!@rag-multi-expert-postgres:5432/rag_db"
+    POSTGRES_SERVER: "rag-multi-expert-postgres"
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: "rag_db"
+    POSTGRES_USER: "raguser"
+    POSTGRES_PASSWORD: "changeMeRag123!"
+    
+    # ChromaDB
+    CHROMA_HOST: "rag-multi-expert-chroma"
+    CHROMA_PORT: "8001"
+    
+    # JWT
+    SECRET_KEY: "changeMeSecretKeyForJWT123"
+    ENCRYPTION_KEY: "changeMeEncryptionKey123="
+    
+    # LLM Providers (API Keys - Override en production)
+    OLLAMA_URL: "http://ollama.default.svc.cluster.local:11434"
+    OPENAI_API_KEY: ""
+    ANTHROPIC_API_KEY: ""
+    # Feature/opeansearchadd
+    OPENSEARCH_HOST: "opensearch.domain.local"
+    OPENSEARCH_PORT: "9200"
+    OPENSEARCH_USER: "admin"
+    OPENSEARCH_PASSWORD: "admin"
+    OPENSEARCH_USE_SSL: "true"
+    OPENSEARCH_VERIFY_CERTS: "false"
+    OPENSEARCH_EMBEDDING_DIM: "384"
+
+# Ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  hosts:
+    - host: rag.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+        - path: /api
+          pathType: Prefix
+          service: backend
+          port: 8000
+  tls:
+    enabled: false
+
+serviceAccount:
+  create: true
+  name: "rag-sa"
+
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

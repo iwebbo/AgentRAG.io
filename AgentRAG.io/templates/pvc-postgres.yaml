@@ -1,0 +1,15 @@
+{{- if and .Values.postgres.enabled .Values.postgres.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "rag.name" . }}-postgres-pvc
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.postgres.storage.className }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.storage.size }}
+{{- end }}
