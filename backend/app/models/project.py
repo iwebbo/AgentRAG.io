@@ -7,25 +7,36 @@ from app.database import Base
 
 class Project(Base):
     __tablename__ = "projects"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    embedding_model = Column(String(100), default="all-MiniLM-L6-v2", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    embedding_model = Column(
+        String(255),
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        nullable=False,
+    )
     chunk_size = Column(Integer, default=2000, nullable=False)
     chunk_overlap = Column(Integer, default=200, nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
+    vector_store_type = Column(String(20), default="chroma", nullable=False)
+    opensearch_index = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
-    # Relationships
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
     user = relationship("User", back_populates="projects")
     documents = relationship("Document", back_populates="project", cascade="all, delete-orphan")
     rag_conversations = relationship("RAGConversation", back_populates="project", cascade="all, delete-orphan")
-    
+
     def __repr__(self):
-        return f"<Project {self.name}>"
+        return f"<Project {self.name!r} [{self.vector_store_type}]>"
 
 
 class Document(Base):

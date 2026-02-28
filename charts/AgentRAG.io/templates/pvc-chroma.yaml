@@ -1,0 +1,15 @@
+{{- if and .Values.chroma.enabled .Values.chroma.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "rag.name" . }}-chroma-pvc
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.chroma.storage.className }}
+  resources:
+    requests:
+      storage: {{ .Values.chroma.storage.size }}
+{{- end }}

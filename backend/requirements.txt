@@ -8,6 +8,9 @@ sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 alembic==1.12.1
 
+#Opensearch
+opensearch-py>=2.4.0
+
 # Authentication & Security
 python-jose[cryptography]==3.3.0
 passlib==1.7.4

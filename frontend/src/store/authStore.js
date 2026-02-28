@@ -17,10 +17,11 @@ export const useAuthStore = create((set) => ({
       set({ user, loading: false });
       return true;
     } catch (error) {
-      set({ 
-        error: error.response?.data?.detail || 'Login failed', 
-        loading: false 
-      });
+      const detail = error.response?.data?.detail;
+      const errorMsg = Array.isArray(detail)
+        ? detail.map(e => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(' | ')
+        : (typeof detail === 'string' ? detail : 'Login failed');
+      set({ error: errorMsg, loading: false });
       return false;
     }
   },
@@ -36,10 +37,11 @@ export const useAuthStore = create((set) => ({
       set({ user, loading: false });
       return true;
     } catch (error) {
-      set({ 
-        error: error.response?.data?.detail || 'Registration failed', 
-        loading: false 
-      });
+      const detail = error.response?.data?.detail;
+      const errorMsg = Array.isArray(detail)
+        ? detail.map(e => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(' | ')
+        : (typeof detail === 'string' ? detail : 'Registration failed');
+      set({ error: errorMsg, loading: false });
       return false;
     }
   },

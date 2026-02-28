@@ -1,0 +1,21 @@
+apiVersion: v2
+name: agentragio
+description: AgentRAG.io - Retrieval-Augmented Generation & MCP Agent
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - rag
+  - llm
+  - ai-assistant
+  - langchain
+  - chromadb
+  - opensearch
+
+home: https://github.com/iwebbo/AgentRAG.io
+sources:
+  - https://github.com/iwebbo/AgentRAG.io
+
+maintainers:
+  - name: DevOps Team
+    email: aecodinglocal@gmail.com

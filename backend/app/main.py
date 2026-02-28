@@ -5,7 +5,7 @@ import logging
 
 from app.config import get_settings
 from app.database import init_db
-from app.routes import auth, chat, conversations, providers, templates, projects, documents, rag_chat, integrations, agents
+from app.routes import auth, chat, conversations, providers, templates, projects, documents, rag_chat, integrations, agents, opeansearch
 
 # Configure logging
 logging.basicConfig(
@@ -21,7 +21,7 @@ settings = get_settings()
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
-    description="RAG & Agent Multi-provider LLM Chat Application with Advanced Streaming",
+    description="AgentRAG & Agent Multi-provider LLM Chat Application with Advanced Streaming & MCP Agent Skills",
     debug=settings.DEBUG
 )
 
@@ -40,7 +40,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
-    logger.info("Starting RAG.io application...")
+    logger.info("Starting AgentRAG.io application...")
     
     # Initialize database
     try:
@@ -89,6 +89,7 @@ app.include_router(documents.router)
 app.include_router(rag_chat.router)
 app.include_router(integrations.router)
 app.include_router(agents.router)
+app.include_router(opeansearch.router)
 
 
 # Global exception handler

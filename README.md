@@ -9,6 +9,8 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-4EAA25?style=for-the-badge&logo=FastAPI&logoColor=black)
 ![React](https://img.shields.io/badge/React-4EAA25?style=for-the-badge&logo=React&logoColor=black)
 ![Docker](https://img.shields.io/badge/Docker-0078D6?style=for-the-badge&logo=Docker&logoColor=black)
+![Opensearch](https://img.shields.io/badge/Opensearch-0078D6?style=for-the-badge&logo=Opensearch&logoColor=black)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-0078D6?style=for-the-badge&logo=ChromaDB&logoColor=black)
 
 ## Table of Contents
 
@@ -60,30 +62,33 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                       Agent Layer                           │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐           │
-│  │   Code     │  │   Legal    │  │ Accounting │  + More   │
-│  │ Generator  │  │  Advisor   │  │  Advisor   │           │
-│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘           │
-│        │                │                │                   │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐             │
+│  │    Code    │  │   Legal    │  │ Accounting │  + More     │
+│  │ Generator  │  │  Advisor   │  │  Advisor   │             │
+│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘             │
+│        │                │                │                  │
 │  ┌─────▼────────────────▼────────────────▼──────┐          │
-│  │           MCP Client (Protocol Layer)         │          │
+│  │          MCP Client (Protocol Layer)          │          │
 │  └─────┬────────────────┬────────────────┬───────┘          │
-│        │                │                │                   │
-│  ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐            │
-│  │  GitHub   │   │   Linter  │   │ Test Runner│  + More   │
-│  │  Server   │   │   Server  │   │   Server   │            │
-│  └───────────┘   └───────────┘   └───────────┘            │
-└─────────────────────────────────────────────────────────────┘
-                            ▲
-                            │
-┌───────────────────────────┼─────────────────────────────────┐
-│                     RAG Layer                               │
-│  ┌────────────────────────▼──────────────────────────┐     │
-│  │  Vector Store (ChromaDB) + LLM Service           │     │
-│  │  • Semantic Search                                │     │
-│  │  • Context Building                               │     │
-│  │  • Multi-Provider LLM                             │     │
-│  └───────────────────────────────────────────────────┘     │
+│        │                │                │                  │
+│  ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐              │
+│  │   GitHub  │   │   Linter  │   │ Test Runner│  + More     │
+│  │   Server  │   │   Server  │   │   Server  │              │
+│  └───────────┘   └───────────┘   └───────────┘              │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        RAG Layer                            │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                 Context & LLM Manager                 │  │
+│  │  • Semantic Search Orchestration   • Multi-LLM Prov.  │  │
+│  └───────────────┬───────────────────────┬───────────────┘  │
+│                  │                       │                  │
+│        ┌─────────▼─────────┐   ┌─────────▼─────────┐        │
+│        │     ChromaDB      │   │    OpenSearch     │        │
+│        │  (Local/Testing)  │   │   (Prod/Scale)    │        │
+│        └───────────────────┘   └───────────────────┘        │
 └─────────────────────────────────────────────────────────────┘
 ```
 

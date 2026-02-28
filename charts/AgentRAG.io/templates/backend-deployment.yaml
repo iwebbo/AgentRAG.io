@@ -1,0 +1,65 @@
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rag.name" . }}-backend
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rag.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "rag.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: backend
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.backend.service.targetPort }}
+          protocol: TCP
+        envFrom:
+        - secretRef:
+            name: {{ .Values.secrets.name }}
+        {{- with .Values.backend.env }}
+        env:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data
+        - name: documents
+          mountPath: {{ .Values.documents.storage.mountPath }}
+        resources:
+          {{- toYaml .Values.backend.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.backend.service.targetPort }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.backend.service.targetPort }}
+          initialDelaySeconds: 15
+          periodSeconds: 5
+      volumes:
+      - name: app-data
+        emptyDir: {}
+      - name: documents
+        persistentVolumeClaim:
+          claimName: {{ include "rag.name" . }}-documents-pvc
+{{- end }}

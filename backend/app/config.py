@@ -1,48 +1,60 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    """Application settings"""
-    
-    # Database
+    """Application settings - loaded from env vars / .env file."""
+
+    # ── Database ─────────────────────────────────────────────────────────────
     DATABASE_URL: str
     DB_ECHO: bool = False
-    
-    # JWT
+
+    # ── JWT ──────────────────────────────────────────────────────────────────
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
-    # Application
+
+    # ── Application ──────────────────────────────────────────────────────────
     APP_NAME: str = "RAG.io"
     DEBUG: bool = False
     CORS_ORIGINS: str = "http://localhost:5173"
-    
-    # Encryption
+
+    # ── Encryption ───────────────────────────────────────────────────────────
     ENCRYPTION_KEY: str
-    
-    # Server
+
+    # ── Server ───────────────────────────────────────────────────────────────
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     WORKERS: int = 4
-    
-    # Streaming
+
+    # ── Streaming ────────────────────────────────────────────────────────────
     STREAM_TIMEOUT: int = 300
     HEARTBEAT_INTERVAL: int = 15
     MAX_RECONNECT_ATTEMPTS: int = 5
     BUFFER_SIZE: int = 1000
-    
-    # Rate Limiting
+
+    # ── Rate Limiting ─────────────────────────────────────────────────────────
     RATE_LIMIT_PER_MINUTE: int = 60
-    
+
+    # ── OpenSearch Vector Store ───────────────────────────────────────────────
+    OPENSEARCH_HOST: str = "localhost"
+    OPENSEARCH_PORT: int = 9200
+    OPENSEARCH_USER: Optional[str] = "admin"
+    OPENSEARCH_PASSWORD: Optional[str] = "admin"
+    OPENSEARCH_USE_SSL: bool = True
+    OPENSEARCH_VERIFY_CERTS: bool = False
+    # Embedding dimension MUST match the embedding model.
+    # all-MiniLM-L6-v2  → 384
+    # all-mpnet-base-v2 → 768
+    OPENSEARCH_EMBEDDING_DIM: int = 384
+
     @property
     def cors_origins_list(self) -> List[str]:
-        """Parse CORS origins string to list"""
+        """Parse CORS origins string to list."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True
@@ -50,5 +62,5 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance"""
+    """Get cached settings instance."""
     return Settings()

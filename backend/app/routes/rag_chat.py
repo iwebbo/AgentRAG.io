@@ -433,7 +433,9 @@ async def rag_chat_stream(
     retrieval_results = vector_store.query(
         project_id=str(request.project_id),
         query_embedding=query_embedding,
-        n_results=adaptive_top_k  # ✅ Dynamique selon stratégie
+        n_results=adaptive_top_k,
+        vector_store_type=getattr(project, "vector_store_type", "chroma"),
+        opensearch_index=getattr(project, "opensearch_index", None),
     )
     
     # 2. Construction contexte RAG

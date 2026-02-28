@@ -33,10 +33,10 @@ const RAGChat = () => {
     model: 'llama2',
     temperature: 0.7,
     reasoning_mode: 'standard',
-    top_k: 5  // ✅ Peut monter jusqu'à 20 maintenant
+    top_k: 5  // âœ… Peut monter jusqu'Ã  20 maintenant
   });
 
-  // ✅ Détection modèle 256K
+  // âœ… DÃ©tection modÃ¨le 256K
   const is256KModel = (model) => {
     const largeModels = ['qwen3-coder:30b','mistral-large','phi3:latest','qwen2.5:72b','phi3:14b','gpt-oss:20b','gpt-4-turbo', 'claude-3', 'gemini-1.5', 'llama3.1'];
     return largeModels.some(m => model.toLowerCase().includes(m));
@@ -58,12 +58,12 @@ const RAGChat = () => {
     }
   }, [chatSettings.provider_name]);
 
-  // ✅ Auto-ajuster top_k si modèle 256K détecté
+  // âœ… Auto-ajuster top_k si modÃ¨le 256K dÃ©tectÃ©
   useEffect(() => {
     if (is256KModel(chatSettings.model) && chatSettings.top_k < 10) {
       setChatSettings(prev => ({
         ...prev,
-        top_k: 15  // ✅ Augmenter automatiquement
+        top_k: 15  // âœ… Augmenter automatiquement
       }));
     }
   }, [chatSettings.model]);
@@ -148,7 +148,7 @@ const RAGChat = () => {
         top_k: res.data.top_k
       });
       
-      console.log('✅ Conversation chargée:', res.data.title, '| Messages:', res.data.messages?.length);
+      console.log('âœ… Conversation chargÃ©e:', res.data.title, '| Messages:', res.data.messages?.length);
     } catch (error) {
       console.error('Failed to load conversation:', error);
       alert('Erreur lors du chargement de la conversation');
@@ -193,9 +193,7 @@ const RAGChat = () => {
     setRetrievedChunks([]);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      
-      const response = await fetch(`${API_URL}/api/rag/chat/stream`, {
+      const response = await fetch(`/api/rag/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -396,7 +394,7 @@ const RAGChat = () => {
                       fontSize: 'var(--text-xs)', 
                       color: 'var(--gray-500)'
                     }}>
-                      {conv.provider_name} • {conv.model}
+                      {conv.provider_name} â€¢ {conv.model}
                     </div>
                   </div>
                   <button
@@ -432,7 +430,7 @@ const RAGChat = () => {
                     Ask questions about the documents in <strong>{project?.name}</strong>. 
                     I'll search through your documents and provide accurate answers with sources.
                   </p>
-                  {/* ✅ Badge 256K si détecté */}
+                  {/* âœ… Badge 256K si dÃ©tectÃ© */}
                   {is256KModel(chatSettings.model) && (
                     <div style={{ 
                       display: 'flex', 
@@ -500,7 +498,7 @@ const RAGChat = () => {
                     </button>
 
                     <div style={{ display: 'flex', gap: 'var(--spacing-2)', alignItems: 'center' }}>
-                      {/* ✅ Badge 256K visible */}
+                      {/* âœ… Badge 256K visible */}
                       {is256KModel(chatSettings.model) && (
                         <span style={{ 
                           display: 'flex', 
@@ -519,7 +517,7 @@ const RAGChat = () => {
                           onClick={() => setShowSources(!showSources)}
                           className="btn-settings-sm"
                         >
-                          🔍 {retrievedChunks.length} sources
+                          ðŸ” {retrievedChunks.length} sources
                         </button>
                       )}
                     </div>
@@ -590,7 +588,7 @@ const RAGChat = () => {
                         </select>
                       </div>
 
-                      {/* ✅ Top-K avec max augmenté pour 256K */}
+                      {/* âœ… Top-K avec max augmentÃ© pour 256K */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
                         <span style={{ fontWeight: '500' }}>Top-K:</span>
                         <input
@@ -628,7 +626,7 @@ const RAGChat = () => {
                           border: '1px solid var(--gray-200)'
                         }}>
                           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)', marginBottom: 'var(--spacing-1)' }}>
-                            📄 {chunk.metadata?.filename} • Score: {(chunk.score * 100).toFixed(1)}%
+                            ðŸ“„ {chunk.metadata?.filename} â€¢ Score: {(chunk.score * 100).toFixed(1)}%
                           </div>
                           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-700)' }}>
                             {chunk.text.substring(0, 150)}...
@@ -680,7 +678,7 @@ const RAGChat = () => {
                     color: 'var(--gray-500)',
                     textAlign: 'center',
                   }}>
-                    {streaming ? 'RAG is thinking...' : 'Press Enter to send • Shift+Enter for new line'}
+                    {streaming ? 'RAG is thinking...' : 'Press Enter to send â€¢ Shift+Enter for new line'}
                   </div>
                 </div>
               </div>

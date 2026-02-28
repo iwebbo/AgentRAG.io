@@ -1,0 +1,56 @@
+{{- if .Values.chroma.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rag.name" . }}-chroma
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chroma
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "rag.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: chroma
+  template:
+    metadata:
+      labels:
+        {{- include "rag.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: chroma
+    spec:
+      containers:
+      - name: chroma
+        image: "{{ .Values.chroma.image.repository }}:{{ .Values.chroma.image.tag }}"
+        imagePullPolicy: {{ .Values.chroma.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.chroma.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: IS_PERSISTENT
+          value: "TRUE"
+        - name: PERSIST_DIRECTORY
+          value: {{ .Values.chroma.storage.mountPath }}
+        - name: ANONYMIZED_TELEMETRY
+          value: "FALSE"
+        volumeMounts:
+        - name: chroma-data
+          mountPath: {{ .Values.chroma.storage.mountPath }}
+        resources:
+          {{- toYaml .Values.chroma.resources | nindent 10 }}
+        livenessProbe:
+          tcpSocket:                           # ← CHANGÉ: TCP au lieu de httpGet
+            port: {{ .Values.chroma.service.targetPort }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:                           # ← CHANGÉ: TCP au lieu de httpGet
+            port: {{ .Values.chroma.service.targetPort }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: chroma-data
+        persistentVolumeClaim:
+          claimName: {{ include "rag.name" . }}-chroma-pvc
+{{- end }}

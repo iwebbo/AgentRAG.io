@@ -1,4 +1,10 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// URL relative pour SSE (nginx proxie /api → backend).
+// WebSocket dérivé dynamiquement depuis window.location pour fonctionner dans tous les environnements.
+const SSE_BASE = '';
+const getWsBase = () => {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${window.location.host}`;
+};
 
 export class StreamingService {
   constructor() {
@@ -18,7 +24,7 @@ export class StreamingService {
     
     try {
       // Make POST request to get stream
-      const response = await fetch(`${API_URL}/api/chat/stream`, {
+      const response = await fetch(`${SSE_BASE}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +83,7 @@ export class StreamingService {
    */
   async startWebSocketStream(request, onMessage, onError, onComplete) {
     const token = localStorage.getItem('access_token');
-    const wsUrl = API_URL.replace('http', 'ws');
+    const wsUrl = getWsBase();
 
     try {
       this.websocket = new WebSocket(`${wsUrl}/api/chat/ws`);

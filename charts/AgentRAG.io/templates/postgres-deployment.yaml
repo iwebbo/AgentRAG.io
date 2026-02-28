@@ -1,0 +1,62 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rag.name" . }}-postgres
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "rag.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "rag.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+        imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.postgres.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          value: {{ .Values.postgres.database }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgres.user }}
+        - name: POSTGRES_PASSWORD
+          value: {{ .Values.postgres.password }}
+        - name: PGDATA
+          value: {{ .Values.postgres.storage.mountPath }}/{{ .Values.postgres.storage.subPath }}
+        volumeMounts:
+        - name: postgres-data
+          mountPath: {{ .Values.postgres.storage.mountPath }}
+        resources:
+          {{- toYaml .Values.postgres.resources | nindent 10 }}
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.postgres.user }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.postgres.user }}
+          initialDelaySeconds: 15
+          periodSeconds: 5
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: {{ include "rag.name" . }}-postgres-pvc
+{{- end }}
