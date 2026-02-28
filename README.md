@@ -348,40 +348,6 @@ All the RAG.io features remain unchanged:
 
 ---
 
-## Tech Stack
-
-### Backend (unchanged from RAG.io)
-- **Framework**: FastAPI 0.104+ (async, type-safe)
-- **Vector DB**: ChromaDB 0.4+ (persistent, HNSW indexing)
-- **Database**: PostgreSQL 15+ (production) / SQLite (dev)
-- **ORM**: SQLAlchemy 2.0+ (async support)
-- **Embeddings**: sentence-transformers (all-MiniLM-L6-v2)
-- **Document Processing**: PyPDF2, python-docx, beautifulsoup4
-- **Auth**: JWT (PyJWT), AES-256 (cryptography)
-- **Streaming**: SSE (Server-Sent Events)
-
-### Agent Layer (NEW)
-- **MCP Protocol**: Custom async client for external tool integration
-- **Agent Orchestration**: BaseAgent with async generators for streaming
-- **Tool Servers**: GitHub, Linter, Test Runner, Document Storage, ERP
-- **Workflow Management**: Multi-step execution with error handling and retries
-
-### Frontend (unchanged from RAG.io)
-- **Framework**: React 18.2 (Vite)
-- **State Management**: Zustand
-- **Routing**: React Router v6
-- **UI**: Tailwind CSS 3.4
-- **Icons**: Lucide React
-- **HTTP**: Axios with interceptors
-- **Markdown**: react-markdown, react-syntax-highlighter
-
-### Infrastructure
-- **Containerization**: Docker + Docker Compose
-- **Reverse Proxy**: Nginx (production)
-- **Deployment**: Single `docker-compose up`
-
----
-
 ## Installation
 
 ### Prerequisites
@@ -399,87 +365,71 @@ All the RAG.io features remain unchanged:
 - PostgreSQL 15+
 ```
 
-### Quick Start (Docker)
+### ☸️ **Quick start with Kubernetes** *(Production-ready)*
 
+> **Helm Chart + Documentation**
+
+[ **Documentation Kubernetes officiel** →](https://iwebbo.github.io/AgentRAG.io/)
+
+### ☸️ **Quick Start with Docker**
+
+### Clone the repository
 ```bash
-# 1. Clone repository
-git clone https://github.com/iwebbo/agentrag.io.git
+git clone https://github.com/iwebbo/AgentRAG.io.git
 cd agentrag.io
+```
 
+### Prepare the Network
+```bash
+docker network create agentrag-network
+```
+
+### Run DB
+```bash
+docker run -d \
+  --name agentrag-db \
+  --network agentrag-network \
+  -e POSTGRES_USER=myuser \
+  -e POSTGRES_PASSWORD=mypassword \
+  -e POSTGRES_DB=agentrag_db \
+  postgres:15-alpine
+```
+### Run Backend
+```bash
 # 2. Generate secrets
 python3 -c "import secrets; print(secrets.token_hex(32))"  # SECRET_KEY
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
 
-# 3. Edit backend/.env with your secrets
-
-# 3.1 Edit backend/.env if (need to be run from VM/PROD Server)
-# Change by your hostname.fqdn or IP
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost,http://localhost:80
-
-# 3.1 Edit frontend/.env if (need to be run from VM/PROD Server)
-# Change by your hostname.fqdn or IP
-VITE_API_URL=http://localhost:8000 
-
-# Will be solve in 1.1.0
-cd backend/
-mkdir -p /app/data/chromadb
-chmod -R 777 /app/data
-
-# 4. Start application
-docker-compose up -d
-
-# 5. Check status
-docker-compose ps
-
-# 6. Access application
-# Frontend: http://localhost:3000
-# Backend: http://localhost:8000
-# API Docs: http://localhost:8000/docs
+docker run -d \
+  --name agentrag-backend \
+  --network agentrag-network \
+  --network-alias backend \
+  -p 8000:8000 \
+  -e SECRET_KEY="SECRET_KEY" \
+  -e ALGORITHM="HS256" \
+  -e ACCESS_TOKEN_EXPIRE_MINUTES=30 \
+  -e REFRESH_TOKEN_EXPIRE_DAYS=7 \
+  -e DEBUG="False" \
+  -e CORS_ORIGINS="http://192.168.1.110:5173,http://192.168.1.110:3000,http://192.168.1.110,http://192.168.1.110:80" \
+  -e ENCRYPTION_KEY="ENCRYPTION_KEY=" \
+  -e DATABASE_URL="postgresql://myuser:mypassword@agentrag-db:5432/agentrag_db" \
+  -e OPENSEARCH_HOST="opensearch.domain.local" \
+  -e OPENSEARCH_PORT="9200" \
+  -e OPENSEARCH_USER="admin" \
+  -e OPENSEARCH_PASSWORD="passwordtochange" \
+  -e OPENSEARCH_USE_SSL="true" \
+  -e OPENSEARCH_VERIFY_CERTS="false" \
+  -e OPENSEARCH_EMBEDDING_DIM="384" \
+  ghcr.io/iwebbo/agentrag.io/backend:sha-fadc6a0
 ```
 
-**First-time setup:**
+### Run Frontend
 ```bash
-# Create first user
-curl -X POST http://localhost:8000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","email":"admin@example.com","password":"SecurePass123!"}'
-
-# Login
-curl -X POST http://localhost:8000/api/auth/login \
-  -d "username=admin&password=SecurePass123!"
-```
-### Manual Installation (Development)
-
-#### Backend
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Setup database
-python -c "from app.database import init_db; init_db()"
-
-# Run development server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-#### Frontend
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Configure API URL
-echo "VITE_API_URL=http://localhost:8000" > .env.local
-
-# Run development server
-npm run dev
+docker run -d \
+  --name agentrag-frontend \
+  --network agentrag-network \
+  -p 80:80 \
+  ghcr.io/iwebbo/agentrag.io/frontend:sha-fadc6a0
 ```
 
 ---
@@ -622,86 +572,6 @@ Check **Agents → Executions** for:
 - MCP call counts
 - Success/failure status
 - Generated outputs
-
----
-
-## Development
-
-### Adding a Custom Agent
-
-```python
-# backend/app/agents/my_custom_agent.py
-from app.agents.base_agent import BaseAgent
-from typing import Dict, Any, AsyncGenerator
-
-class MyCustomAgent(BaseAgent):
-    """Custom agent for specialized workflow"""
-    
-    async def execute(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-        # 1. Log start
-        yield self.log("info", "Starting custom workflow")
-        
-        # 2. Get RAG context
-        context = await self.get_rag_context(
-            query=input_data.get("prompt"),
-            top_k=5
-        )
-        yield self.log("info", f"Retrieved {len(context)} context chunks")
-        
-        # 3. Call MCP tool
-        result = await self.call_mcp(
-            server="github",
-            method="get_pr",
-            params={"pr_number": input_data["pr_number"]}
-        )
-        yield self.log("info", f"Fetched PR #{input_data['pr_number']}")
-        
-        # 4. Call LLM
-        response = await self.call_llm(
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant"},
-                {"role": "user", "content": input_data["prompt"]}
-            ],
-            temperature=0.7
-        )
-        yield self.log("info", "LLM response generated")
-        
-        # 5. Return final result
-        yield {
-            "type": "result",
-            "data": {
-                "output": response,
-                "context_used": len(context),
-                "pr_analyzed": result
-            }
-        }
-```
-
-### Adding a Custom MCP Server
-
-```python
-# backend/app/mcp_servers/my_custom_server.py
-import httpx
-from typing import Dict, Any
-
-class MyCustomMCPServer:
-    """MCP Server for custom integration"""
-    
-    def __init__(self, api_key: str, base_url: str):
-        self.api_key = api_key
-        self.base_url = base_url
-    
-    async def my_method(self, param1: str, param2: int) -> Dict[str, Any]:
-        """Custom method implementation"""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/endpoint",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                params={"param1": param1, "param2": param2}
-            )
-            response.raise_for_status()
-            return response.json()
-```
 
 ---
 
