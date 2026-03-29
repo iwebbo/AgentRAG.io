@@ -92,17 +92,6 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Key Differentiators
-
-| Feature | Traditional RAG | AgentRAG.io |
-|---------|----------------|--------------|
-| **Document Q&A** | ✅ Semantic search + LLM | ✅ Same |
-| **Code Generation** | ❌ Manual copy/paste | ✅ Auto-generate with tests |
-| **External Actions** | ❌ No tool access | ✅ GitHub, Jira, Slack, etc. |
-| **Autonomous Workflows** | ❌ Single-shot responses | ✅ Multi-step agent execution |
-| **Context Awareness** | ✅ RAG context | ✅ RAG + real-time data from MCP |
-| **Testing & QA** | ❌ Manual | ✅ Auto-run tests via MCP |
-
 ---
 
 ## Demo
@@ -185,6 +174,91 @@ All the RAG.io features remain unchanged:
 
 ---
 
+## Installation
+
+### Prerequisites
+
+```bash
+# Required
+- Docker 24.0+
+- Docker Compose 2.20+
+- 8GB RAM minimum (16GB recommended)
+- 10GB disk space
+
+# Optional (for local development)
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL 15+
+```
+
+### ☸️ **Quick start with Kubernetes** *(Production-ready)*
+
+> **Helm Chart + Documentation**
+
+[ **Documentation Kubernetes officiel** →](https://iwebbo.github.io/AgentRAG.io/)
+
+### ☸️ **Quick Start with Docker**
+
+### Clone the repository
+```bash
+git clone https://github.com/iwebbo/AgentRAG.io.git
+cd agentrag.io
+```
+
+### Prepare the Network
+```bash
+docker network create agentrag-network
+```
+
+### Run DB
+```bash
+docker run -d \
+  --name agentrag-db \
+  --network agentrag-network \
+  -e POSTGRES_USER=myuser \
+  -e POSTGRES_PASSWORD=mypassword \
+  -e POSTGRES_DB=agentrag_db \
+  postgres:15-alpine
+```
+### Run Backend
+```bash
+# 2. Generate secrets
+python3 -c "import secrets; print(secrets.token_hex(32))"  # SECRET_KEY
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
+
+docker run -d \
+  --name agentrag-backend \
+  --network agentrag-network \
+  --network-alias backend \
+  -p 8000:8000 \
+  -e SECRET_KEY="SECRET_KEY" \
+  -e ALGORITHM="HS256" \
+  -e ACCESS_TOKEN_EXPIRE_MINUTES=30 \
+  -e REFRESH_TOKEN_EXPIRE_DAYS=7 \
+  -e DEBUG="False" \
+  -e CORS_ORIGINS="http://192.168.1.110:5173,http://192.168.1.110:3000,http://192.168.1.110,http://192.168.1.110:80" \
+  -e ENCRYPTION_KEY="ENCRYPTION_KEY=" \
+  -e DATABASE_URL="postgresql://myuser:mypassword@agentrag-db:5432/agentrag_db" \
+  -e OPENSEARCH_HOST="opensearch.domain.local" \
+  -e OPENSEARCH_PORT="9200" \
+  -e OPENSEARCH_USER="admin" \
+  -e OPENSEARCH_PASSWORD="passwordtochange" \
+  -e OPENSEARCH_USE_SSL="true" \
+  -e OPENSEARCH_VERIFY_CERTS="false" \
+  -e OPENSEARCH_EMBEDDING_DIM="384" \
+  ghcr.io/iwebbo/agentrag.io/backend:sha-fadc6a0
+```
+
+### Run Frontend
+```bash
+docker run -d \
+  --name agentrag-frontend \
+  --network agentrag-network \
+  -p 80:80 \
+  ghcr.io/iwebbo/agentrag.io/frontend:sha-fadc6a0
+```
+
+---
 
 ## Available Agents
 
@@ -348,88 +422,142 @@ All the RAG.io features remain unchanged:
 
 ---
 
-## Installation
+## Opensearch Guide
 
-### Prerequisites
+IMPORTANT : AgentRAG.io need to have some prerequesite to use it. 
+
+**Documentation**:
+- Example of create index with mandatory field 
+- Example of workflow add data into Opensearch index using DocVector and ask with AgentRAG.IO
+- Example of workflow add data into Openserach index using an external API and upload with DocVector and ask to AgentRAG.io 
+
+### 1. Opensearch Mandatory Field Create index
+
+- "embedding": ## Mandatory field to have
 
 ```bash
-# Required
-- Docker 24.0+
-- Docker Compose 2.20+
-- 8GB RAM minimum (16GB recommended)
-- 10GB disk space
-
-# Optional (for local development)
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 15+
+curl -k -X PUT "https://opensearch.local:9200/index-example" \
+-u 'user:pwd' \
+-H 'Content-Type: application/json' \
+-d '{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 100
+    }
+  },
+  "mappings": {
+    "properties": {
+      "embedding": {
+        "type": "knn_vector",
+        "dimension": 384,
+        "method": {
+          "name": "hnsw",
+          "space_type": "cosinesimil",
+          "engine": "lucene"
+        }
+      },
+      "text_content": { "type": "text" },
+      "source_doc": { "type": "keyword" }
+    }
+  }
+}'
 ```
 
-### ☸️ **Quick start with Kubernetes** *(Production-ready)*
+- "metadata": ## Mandatory structure to have and field
 
-> **Helm Chart + Documentation**
-
-[ **Documentation Kubernetes officiel** →](https://iwebbo.github.io/AgentRAG.io/)
-
-### ☸️ **Quick Start with Docker**
-
-### Clone the repository
 ```bash
-git clone https://github.com/iwebbo/AgentRAG.io.git
-cd agentrag.io
+#Syntax mandatory to have for AgentRAG.io ingestion Opensearch data/index.
+#Example : 
+
+    doc_id = f"{category}-{mac.replace(':', '')}"
+    doc = {
+        "chunk_id": doc_id,
+        "content": content_text,
+        "embedding": embedding,
+        "title": f"Host: {name}",
+        "metadata": {
+            "source_type": "source_api",
+            "ip": ip,
+            "mac": mac,
+            "is_active": is_active,
+            "category": category,
+            "created_at": datetime.utcnow().isoformat()
+        }
+    }
 ```
 
-### Prepare the Network
+---
+
+### 2. Workflow upload/add data for Opensearch index using DocVector.io 
+
+DocVector.io : https://github.com/iwebbo/DocVector 
+
 ```bash
-docker network create agentrag-network
+git clone https://github.com/iwebbo/DocVector.git
+
+- Install it 
+- Use it 
+
 ```
 
-### Run DB
-```bash
-docker run -d \
-  --name agentrag-db \
-  --network agentrag-network \
-  -e POSTGRES_USER=myuser \
-  -e POSTGRES_PASSWORD=mypassword \
-  -e POSTGRES_DB=agentrag_db \
-  postgres:15-alpine
-```
-### Run Backend
-```bash
-# 2. Generate secrets
-python3 -c "import secrets; print(secrets.token_hex(32))"  # SECRET_KEY
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
-
-docker run -d \
-  --name agentrag-backend \
-  --network agentrag-network \
-  --network-alias backend \
-  -p 8000:8000 \
-  -e SECRET_KEY="SECRET_KEY" \
-  -e ALGORITHM="HS256" \
-  -e ACCESS_TOKEN_EXPIRE_MINUTES=30 \
-  -e REFRESH_TOKEN_EXPIRE_DAYS=7 \
-  -e DEBUG="False" \
-  -e CORS_ORIGINS="http://192.168.1.110:5173,http://192.168.1.110:3000,http://192.168.1.110,http://192.168.1.110:80" \
-  -e ENCRYPTION_KEY="ENCRYPTION_KEY=" \
-  -e DATABASE_URL="postgresql://myuser:mypassword@agentrag-db:5432/agentrag_db" \
-  -e OPENSEARCH_HOST="opensearch.domain.local" \
-  -e OPENSEARCH_PORT="9200" \
-  -e OPENSEARCH_USER="admin" \
-  -e OPENSEARCH_PASSWORD="passwordtochange" \
-  -e OPENSEARCH_USE_SSL="true" \
-  -e OPENSEARCH_VERIFY_CERTS="false" \
-  -e OPENSEARCH_EMBEDDING_DIM="384" \
-  ghcr.io/iwebbo/agentrag.io/backend:sha-fadc6a0
+```text
+Step1 : Upload fichiers      Step2 : Ingestion         Step3 : RAG Queries
+        ↓                              ↓                          ↓
+┌───────────────────┐       ┌───────────────────┐      ┌──────────────────┐
+│  DocVector GUI    │       │  OpenSearch       │      │  AgentRAG.io     │
+│                   │       │  Vector Index     │      │                  │
+│  [Drop Files]     │──────▶│  knowledge_base   │◀─────│  [Ask Questions] │
+│                   │       │                   │      │                  │
+└───────────────────┘       └───────────────────┘      └──────────────────┘
 ```
 
-### Run Frontend
+---
+
+### 3. Workflow upload/add data for Opensearch index using script example and upload/ingest from DocVector API
+
+DocVector.io : https://github.com/iwebbo/DocVector 
+
 ```bash
-docker run -d \
-  --name agentrag-frontend \
-  --network agentrag-network \
-  -p 80:80 \
-  ghcr.io/iwebbo/agentrag.io/frontend:sha-fadc6a0
+git clone https://github.com/iwebbo/DocVector.git
+
+- Install it 
+- Use API to Upload/Ingest data to Opensearch Index. 
+
+```
+
+Extraction API to Markdown file 
+```bash
+curl -s https://api.local/inventory \
+  -H "Authorization: Bearer TOKEN" | \
+  jq -r '"# Infrastructure Inventory\n\n" + 
+    (.servers[] | "## " + .name + "\n- IP: " + .ip + "\n- Status: " + .status + "\n\n")' \
+  > infrastructure.md
+```
+
+Example of data 
+```bash
+# Infrastructure Inventory
+## server-01
+- IP: 10.0.1.10
+- Status: active
+
+## server-02
+- IP: 10.0.1.11
+- Status: active
+```
+
+Upload markdown file to DocVector API
+```bash
+curl -k -X POST https://docvector.local/api/upload \
+  -F "files[]=@infrastructure.md"
+```
+
+Ingest into Opensearch with DocVector API
+```bash
+curl -k -X POST https://docvector.local/api/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"recreate": false, "auto_cleanup": true}'
 ```
 
 ---
