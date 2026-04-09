@@ -179,13 +179,19 @@ All the RAG.io features remain unchanged:
 ### Prerequisites
 
 ```bash
-# Required
+# Kubernetes / Helm (production)
+- 4 vCPU minimum namespace
+- 8GB RAM node minimum (6GB can be usable)
+- 12GB RAM for Agent Usage (Legal/Accounting - simultaneous launch )
+- 80GB stockage PVC (20Gi Chroma + 10Gi Postgres + 50Gi Documents)
+
+# Docker Compose (dev local)
 - Docker 24.0+
 - Docker Compose 2.20+
-- 8GB RAM minimum (16GB recommended)
+- 6GB RAM minimum (8GB recommended)
 - 10GB disk space
 
-# Optional (for local development)
+# Optionnel (dev mode)
 - Python 3.11+
 - Node.js 18+
 - PostgreSQL 15+
