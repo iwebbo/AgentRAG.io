@@ -75,6 +75,9 @@ class DocumentProcessor:
         '.ini': 'INI Config',
         '.env': 'Environment File',
         '.jenkinsfile': 'Jenkins Pipeline',
+        '.conf': 'Config File',
+        '.tpl': 'Helm Template',
+        '': 'Extensionless Script',
         
         # Archives
         '.zip': 'ZIP Archive',
@@ -93,6 +96,10 @@ class DocumentProcessor:
             return True
         
         suffix = path.suffix.lower()
+        # Add manage no extension like jenkinsfile or dockerfile
+        if suffix == '' and path.name:
+            return True
+        
         return suffix in DocumentProcessor.SUPPORTED_FORMATS
     
     @staticmethod
@@ -161,6 +168,9 @@ class DocumentProcessor:
             '.ini': DocumentProcessor._extract_ini,
             '.env': DocumentProcessor._extract_code,
             '.jenkinsfile': DocumentProcessor._extract_code,
+            '.conf': DocumentProcessor._extract_code,
+            '.tpl': DocumentProcessor._extract_code,
+            '': DocumentProcessor._extract_code,
             
             # Archives
             '.zip': DocumentProcessor._extract_zip,

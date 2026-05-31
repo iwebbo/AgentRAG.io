@@ -101,7 +101,8 @@ class SmartChunker:
             if current_tokens + para_tokens > chunk_size:
                 if current_chunk:
                     # Sauvegarder chunk actuel
-                    chunk_text = "\n\n".join(current_chunk)
+                    #chunk_text = "\n\n".join(current_chunk) # Fix/Feature RAG Filename integrate
+                    chunk_text = f"# File: {metadata.get('filename', '')}\n\n" + "\n\n".join(current_chunk)
                     chunks.append({
                         "text": chunk_text,
                         "metadata": {
@@ -133,7 +134,8 @@ class SmartChunker:
         
         # Dernier chunk
         if current_chunk:
-            chunk_text = "\n\n".join(current_chunk)
+            #chunk_text = "\n\n".join(current_chunk) # Fix/Feature RAG Filename integrate
+            chunk_text = f"# File: {metadata.get('filename', '')}\n\n" + "\n\n".join(current_chunk)
             chunks.append({
                 "text": chunk_text,
                 "metadata": {

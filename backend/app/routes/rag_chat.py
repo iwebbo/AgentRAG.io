@@ -44,37 +44,37 @@ class QueryType(Enum):
 RAG_STRATEGIES = {
     QueryType.ARCHITECTURE: {
         "description": "Vue globale projet",
-        "top_k": 50,
-        "context_ratio": 0.6,  # 60% du contexte disponible
+        "top_k": 5,
+        "context_ratio": 0.5,  # 60% du contexte disponible
         "include_index": True
     },
     QueryType.CODE_GEN: {
         "description": "Génération de code",
-        "top_k": 40,
-        "context_ratio": 0.7,
+        "top_k": 6,
+        "context_ratio": 0.5,
         "include_index": True
     },
     QueryType.DEBUG: {
         "description": "Debug/Fix",
-        "top_k": 30,
+        "top_k": 5,
         "context_ratio": 0.5,
         "include_index": False
     },
     QueryType.FEATURE: {
         "description": "Nouvelle fonctionnalité",
-        "top_k": 45,
-        "context_ratio": 0.65,
+        "top_k": 8,
+        "context_ratio": 0.5,
         "include_index": True
     },
     QueryType.SIMPLE: {
         "description": "Question simple",
-        "top_k": 15,
-        "context_ratio": 0.4,
+        "top_k": 5,
+        "context_ratio": 0.5,
         "include_index": False
     }
 }
 
-# Limites de contexte par modèle (VOTRE CODE EXISTANT)
+# Limites de contexte par modèle
 MODEL_CONTEXT_LIMITS = {
     # OpenAI
     "gpt-4-turbo": 128000,
@@ -123,17 +123,25 @@ MODEL_CONTEXT_LIMITS = {
     "gemma2:2b": 8192,
     "gemma2:9b": 8192,
     "gemma2:27b": 8192,
+    "gemma3:4b": 128000,
+    "gemma3:27b": 128000,
+    "gemma3:27b-it-qat": 128000,
+    "gemma4:e4b": 128000,
+    "gemma4:26b": 128000,
+    "gemma4:e2b": 128000,
     
     # Ollama - Phi-3.5 (Microsoft)
     "phi3:14b": 128000,
     "phi3:latest": 128000,
     "phi4:14b": 16000,
     "phi4:latest": 16000,
+    "phi4-reasoning:14b": 32000,
 
     # Ollama - DeepSeek
     "deepseek-coder:6.7b": 16384,
     "deepseek-coder:33b": 16384,
     "deepseek-r1:32b": 128000,
+    "deepseek-r1:14b": 128000,
     
     # Ollama - Code Llama
     "codellama:7b": 16384,
@@ -143,6 +151,24 @@ MODEL_CONTEXT_LIMITS = {
     # Ollama - Gpt-oss
     "gpt-oss:20b": 128000,
     
+    # LMStudio - gpt-oss
+    "openai/gpt-oss-20b": 128000,
+
+    # LMStudio - Gemma
+    "google/gemma-4-e4b": 128000,
+
+    # LMStudio - Mistral
+    "mistralai/ministral-3-3b": 128000,
+    "mistralai/ministral-3-14b-reasoning": 128000,
+    "mistralai/codestral-22b-v0.1": 128000,
+
+    # LMStudio - Llama
+    "meta-llama-3.1-8b-instruct": 128000,
+    "llama-3.2-3b-instruct": 128000,
+    
+    # LMStudio - Qwen
+    "qwen/qwen3.5-9b": 128000,
+
     # Fallback
     "default": 8192
 }
@@ -430,14 +456,34 @@ async def rag_chat_stream(
     logger.info(f"🔍 Searching for: {request.message}")
     query_embedding = embedder.encode_single(request.message)
     
+    # Release/Fix add detect name file - Request RAG
+    filename_filter = None
+    file_match = re.search(r'\b([\w\-]+\.\w+)\b', request.message)
+    if file_match:
+        detected_file = file_match.group(1)
+        filename_filter = {"filename": {"$eq": detected_file}}
+        logger.info(f"📎 Filename filter detected: {detected_file}")
+
     retrieval_results = vector_store.query(
         project_id=str(request.project_id),
         query_embedding=query_embedding,
         n_results=adaptive_top_k,
+        where=filename_filter,
         vector_store_type=getattr(project, "vector_store_type", "chroma"),
         opensearch_index=getattr(project, "opensearch_index", None),
     )
     
+    if filename_filter and not retrieval_results['documents'][0]:
+        logger.info(f"📎 Filename filter returned 0 results, retrying without filter")
+        retrieval_results = vector_store.query(
+            project_id=str(request.project_id),
+            query_embedding=query_embedding,
+            n_results=adaptive_top_k,
+            where=None,
+            vector_store_type=getattr(project, "vector_store_type", "chroma"),
+            opensearch_index=getattr(project, "opensearch_index", None),
+        )
+
     # 2. Construction contexte RAG
     retrieved_chunks = []
     rag_context_parts = []
@@ -502,28 +548,74 @@ async def rag_chat_stream(
     # System prompt avec contexte RAG
     system_tokens = 0
     if rag_context:
-        system_prompt = f"""Tu es un assistant expert qui répond en te basant sur les documents fournis.
+            # =====================================================================
+            # AUTO-REASONING RAG — détection depuis le type de requête + message
+            # Indépendant des règles RAG documentaires (qui restent inchangées)
+            # #52 Ticket in GITEA.
+            # =====================================================================
+            reasoning_block = ""
+            effective_reasoning = request.reasoning_mode or "standard"
 
-{rag_context}
+            if effective_reasoning == "auto":
+                msg_lower = request.message.lower()
+                _code_kw = ["crée", "génère", "implémente", "code", "fonction", "classe",
+                            "endpoint", "script", "create", "generate", "implement", "build"]
+                _analysis_kw = ["architecture", "analyse", "explique", "compare", "pourquoi",
+                                "overview", "décris", "explain", "describe"]
+                _debug_kw = ["bug", "erreur", "error", "fix", "répare", "corrige",
+                            "ne fonctionne pas", "debug", "crash"]
 
-**RÈGLES**:
-- Base-toi PRIORITAIREMENT sur le contexte documentaire fourni
-- Si l'information n'est pas dans le contexte, utilise tes connaissances générales.
-- Cite tes sources avec [SOURCE X]
-- Pour les requêtes de type "{query_type.value}", sois particulièrement {"exhaustif et détaillé" if query_type in [QueryType.ARCHITECTURE, QueryType.CODE_GEN] else "précis et concis et trés détaillé"}
-- Réponds en français sauf si demandé autrement
-**REGLES**: Si génération de code demandé, ou detécté, respecter les points ci-dessous.
-- Produis du code production-ready avec gestion d'erreurs
-- Inclus commentaires explicatifs pour logique complexe
-- Genere un README.md au format markdown qui explique toute la génération/solution"""
+                if query_type in [QueryType.CODE_GEN] or any(kw in msg_lower for kw in _code_kw):
+                    effective_reasoning = "cot"
+                elif query_type in [QueryType.ARCHITECTURE] or any(kw in msg_lower for kw in _analysis_kw):
+                    effective_reasoning = "deep"
+                elif query_type in [QueryType.DEBUG] or any(kw in msg_lower for kw in _debug_kw):
+                    effective_reasoning = "cot"
+                else:
+                    effective_reasoning = "standard"
+                logger.info(f"🧠 RAG auto-reasoning résolu: '{effective_reasoning}' (query_type={query_type.value})")
 
-        system_tokens = estimate_tokens(system_prompt)
-        messages.append({
-            "role": "system",
-            "content": system_prompt
-        })
-        
-        logger.info(f"📋 System prompt: {system_tokens:,} tokens")
+            if effective_reasoning == "cot":
+                reasoning_block = """
+    **PROCESSUS DE RAISONNEMENT** (applique en interne avant de répondre):
+    1. **Compréhension** — reformule mentalement ce qui est demandé
+    2. **Recherche** — identifie les sources pertinentes dans les documents fournis
+    3. **Génération** — produis la réponse/solution complète
+    4. **Vérification** — vérifie la cohérence avec les sources et les règles ci-dessous
+
+    """
+            elif effective_reasoning == "deep":
+                reasoning_block = """
+    **PROCESSUS DE RAISONNEMENT** (analyse multi-perspectives avant de répondre):
+    1. **Compréhension** — décompose la question, identifie les enjeux
+    2. **Exploration** — explore les alternatives et les compromis depuis les documents
+    3. **Synthèse** — produis une réponse nuancée et complète
+    4. **Validation** — confirme la cohérence avec le contexte documentaire
+
+    """
+
+            system_prompt = f"""Tu es un assistant expert qui répond en te basant sur les documents fournis.
+
+    {rag_context}
+    {reasoning_block}
+    **RÈGLES**:
+    - Base-toi PRIORITAIREMENT sur le contexte documentaire fourni
+    - Si l'information n'est pas dans le contexte, utilise tes connaissances générales.
+    - Cite tes sources avec [SOURCE X]
+    - Pour les requêtes de type "{query_type.value}", sois particulièrement {"exhaustif et détaillé" if query_type in [QueryType.ARCHITECTURE, QueryType.CODE_GEN] else "précis et concis et trés détaillé"}
+    - Réponds en français sauf si demandé autrement
+    **REGLES**: Si génération de code demandé, ou detécté, respecter les points ci-dessous.
+    - Produis du code production-ready avec gestion d'erreurs
+    - Inclus commentaires explicatifs pour logique complexe
+    - Genere un README.md au format markdown qui explique toute la génération/solution"""
+
+            system_tokens = estimate_tokens(system_prompt)
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+            
+            logger.info(f"📋 System prompt: {system_tokens:,} tokens")
     
     # Charger historique
     past_messages = db.query(RAGMessage).filter(

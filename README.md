@@ -2,7 +2,7 @@
 
 # AgentRAG.io - Intelligent RAG with Autonomous Agents
 
-**Enterprise RAG platform with MCP-powered autonomous agents for code generation, legal advisory, accounting, and more**
+**Enterprise RAG platform with MCP-powered autonomous agents for SSH Admin, Win Admin, code generation, legal advisory, accounting, and more - like OpenClaw**
 
 ![License](https://img.shields.io/badge/MIT-00599C?style=for-the-badge&logo=MIT&logoColor=black)
 ![Python](https://img.shields.io/badge/Python-4EAA25?style=for-the-badge&logo=Python&logoColor=black)
@@ -33,11 +33,14 @@
 
 ## Overview
 
-AgentRAG.io extends RAG.io with **autonomous MCP agents** that combine RAG intelligence with external tool execution. Built for enterprises and developers who need:
+AgentRAG.io extends RAG.io with autonomous MCP agents that combine RAG intelligence with external tool execution. Built for enterprises and developers who need AI that acts, not just answers.
 
-- **Autonomous Agents**: Code generation, branch review, legal advisory, accounting automation, Email management
-- **RAG-Powered Intelligence**: Agents leverage your document knowledge base for context-aware decisions
-- **MCP Integration**: Seamless connection to GitHub, Jira, Slack, testing frameworks, linters, and more
+- **Skill-Based Agents**: Instantiate any agent from a single .md file — define purpose, MCP servers, and RAG context in frontmatter YAML, register via API, run immediately.
+- **Remote Execution**: Operate Linux servers over SSH (Nginx, Apache, Docker, Kubernetes, PostgreSQL, MySQL) and Windows servers over WinRM (IIS, SQL Server, PowerShell) — credentials resolved securely from DB, never in plain config.
+- **Built-in Agent Library**: Code generation, branch code review, legal advisory, accounting automation, travel planning, email management, web search — ready out of the box.
+- **RAG-Powered Intelligence**: Every agent leverages your document knowledge base for context-aware decisions — architecture docs, runbooks, contracts, standards, or any indexed content.
+- **MCP Integration**: Seamless connection to GitHub, Jira, Slack, testing frameworks, linters, WinRM, SSH ...
+- **Vector DB**: ChromaDB, Opensearch
 - **Real-Time Streaming**: Progressive agent execution with live logs and status updates
 - **Fine-Grained Control**: Configure agent behavior, timeouts, retries, and MCP server access
 - **Project-Based Organization**: Isolate documents, conversations, and agent workflows by project
@@ -131,16 +134,19 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 
 #### **Agent Types Available**
 
-| Agent | Use Case | MCP Servers | RAG Context |
-|-------|----------|-------------|-------------|
-| **Code Generator** | Generate code from natural language | GitHub, Linter, Test Runner | Repository docs |
-| **Branch Code Review** | Automated PR review with suggestions | GitHub | Coding standards |
-| **Legal Advisor** | Contract analysis, compliance checks | Document storage | Legal database |
-| **Accounting Advisor** | Financial analysis, invoice processing | ERP systems | Accounting rules |
-| **Web Search** | A sample Agent of Web Search
-| **Travel Epert** | Managemenent, analysis, planned your Travel 
-| **Email Epert** | analysis, send email with LLM
-| *(Custom)* | Build your own specialized agent | Any MCP server | Any project |
+| Agent | `agent_type` | Use Case | MCP Servers | RAG Context |
+|-------|-------------|----------|-------------|-------------|
+| **Code Generator** | `code_generator` | Generate code from natural language | GitHub, Linter, Test Runner | Repository docs |
+| **Branch Code Review** | `branch_code_review` | Automated PR review with suggestions | GitHub | Coding standards |
+| **Legal Advisor** | `legal_fiscal` | Contract analysis, compliance checks | — | Legal database |
+| **Accounting Advisor** | `accounting_finance` | Financial analysis, invoice processing | — | Accounting rules |
+| **Web Search** | `websearch` | Real-time web search & synthesis | — | — |
+| **Travel Expert** | `travel_expert` | Trip planning, itinerary management | — | Travel knowledge |
+| **Email Expert** | `email_expert` | Draft, analyse and send emails via LLM | — | — |
+| **SSH Agent** | `skill` (.md) | Remote command execution on Linux/Unix hosts | SSH (DB-aware) | — |
+| **WinRM Agent** | `skill` (.md) | Remote PowerShell execution on Windows hosts | WinRM (DB-aware) | — |
+| **Skill Agent** | `skill` | Any custom agent defined via `.md` frontmatter | Any registered MCP | Any project |
+| *(Custom)* | `skill` | Build your own specialized agent | Any MCP server | Any project |
 
 ### Core RAG Features (from RAG.io)
 
@@ -154,7 +160,7 @@ All the RAG.io features remain unchanged:
 - **Batch Processing**: Background async processing with progress tracking
 
 #### **Semantic Search**
-- **Vector Database**: ChromaDB with HNSW indexing
+- **Vector Database**: ChromaDB with HNSW indexing, Opensearch
 - **Embedding Models**: sentence-transformers/all-MiniLM-L6-v2 (default), OpenAI embeddings
 - **Adjustable top-k**: Dynamic retrieval (1-20 chunks) based on model context
 - **Distance Scoring**: Cosine similarity with configurable threshold
@@ -426,6 +432,224 @@ docker run -d \
 - Tax compliance checks
 - Expense categorization
 
+---
+
+### 5. SSH Agent — Linux Server Monitoring
+
+**Purpose**: Operate and monitor Linux servers via natural language. Covers Apache/Nginx web server management, Kubernetes node inspection, Docker container lifecycle, PostgreSQL/MySQL health checks, log analysis, disk/CPU/memory diagnostics, zero-downtime deployments, and automated incident remediation — all executed through SSH without leaving your chat interface.
+
+**Use Cases**:
+"nginx is returning 502 on prod-web-01, check error logs and reload config"
+"list all pods in CrashLoopBackOff on the k8s node"
+"rotate logs on all app servers and check disk space after"
+"restart the PostgreSQL service and verify replication lag"
+"deploy the latest Docker image to staging and confirm the container is healthy"
+"check Apache virtual hosts config and test syntax before reload"
+"analyze the last 100 lines of /var/log/syslog for OOM kills"
+
+**Workflow**:
+1. Create host Linux / Windows
+2. Create .md skills
+3. Upload & Import
+4. Run Agent
+
+**Host**:
+```bash
+{
+# SSH par clé privée
+POST /api/hosts
+{
+  "name": "prod-web-01",
+  "protocol": "ssh",
+  "host": "192.168.1.10",
+  "port": 22,
+  "username": "deploy",
+  "credential_type": "key",
+  "key_content": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+  "key_passphrase": "optional_passphrase",
+  "tags": ["production", "web"],
+  "notes": "Web server prod cluster A"
+}
+
+# OU SSH par mot de passe
+POST /api/hosts
+{
+  "name": "prod-web-01",
+  "protocol": "ssh",
+  "host": "192.168.1.10",
+  "port": 22,
+  "username": "deploy",
+  "credential_type": "password",
+  "password": "s3cur3p4ss",
+  "tags": ["production", "web"]
+}
+```
+**Skill**:
+
+```bash
+POST /api/skills/register
+Content-Type: multipart/form-data
+
+file=@linux_server_agent.md
+auto_create_agent=true
+llm_provider=ollama
+llm_model=llama3.1
+```
+
+```md
+skill_id: k8s_ops
+type: agent
+mcp_servers: [ssh]
+description: "Ops noeuds Kubernetes via kubectl"
+tags: [kubernetes,k8s,kubectl,ssh]
+---
+## Mapping
+- pods             → kubectl get pods -A
+- logs <pod>       → kubectl logs <pod> --tail=50
+- describe <pod>   → kubectl describe pod <pod>
+- nodes            → kubectl get nodes -o wide
+- drain <node>     → kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
+- events           → kubectl get events --sort-by=.lastTimestamp -A | tail -20
+## Format
+✅ Succès | ⚠️ Warning | ❌ Erreur + stderr + fix
+```
+
+### Linux SSH Agents
+ 
+| Skill | Purpose |
+|-------|---------|
+| `nginx_ops` | Manage Nginx — config test, reload, log analysis, upstream health, SSL expiry check |
+| `apache_ops` | Manage Apache — VHost management, mod_status, graceful restart, SSL, access log analysis |
+| `kubernetes_node_ops` | Inspect Kubernetes — pod triage, CrashLoopBackOff diagnosis, node drain, rolling restarts, rollback |
+| `docker_ops` | Operate Docker — container lifecycle, image pull, health checks, Compose redeploy, prune |
+| `postgres_ops` | Monitor PostgreSQL — replication lag, slow queries, lock contention, bloat, backup status |
+| `mysql_ops` | Monitor MySQL/MariaDB — processlist, replica lag, slow log, InnoDB metrics, backup check |
+| `linux_incident` | Triage Linux incidents — CPU/memory/disk pressure, OOM kills, systemd failures, network saturation |
+| `log_analyzer` | Analyse any log — grep/awk/tail, error patterns, log rotation, SFTP download |
+| `deploy_rollback` | Deploy & rollback — git pull, build, service restart, health check, auto-rollback on failure |
+
+
+---
+
+### 6. WinRM Agent — Windows Server Operations
+
+**Purpose**: Financial analysis, invoice processing, and regulatory compliance.
+
+**Workflow**:
+1. Create host Linux / Windows
+2. Create .md skills
+3. Upload & Import
+4. Run Agent
+
+**Host**:
+```bash
+# WinRM NTLM 
+POST /api/hosts
+{
+  "name": "win-srv-01",
+  "protocol": "winrm",
+  "host": "10.0.0.20",
+  "port": 5985,
+  "username": "Administrator",
+  "credential_type": "ntlm",
+  "password": "W1nd0wsP4ss!",
+  "domain": "CORP",
+  "winrm_transport": "ntlm",
+  "winrm_server_cert_validation": "ignore",
+  "tags": ["windows", "production", "iis"],
+  "notes": "IIS production server"
+}
+
+# WinRM HTTPS (port 5986 + cert)
+POST /api/hosts
+{
+  "name": "win-srv-01-secure",
+  "protocol": "winrm",
+  "host": "10.0.0.20",
+  "port": 5986,
+  "username": "Administrator",
+  "credential_type": "ntlm",
+  "password": "W1nd0wsP4ss!",
+  "winrm_transport": "ntlm",
+  "winrm_server_cert_validation": "validate",
+  "tags": ["windows", "production"]
+}
+```
+**Skill**:
+
+```bash
+POST /api/skills/register
+Content-Type: multipart/form-data
+
+file=@windows_server_agent.md
+auto_create_agent=true
+llm_provider=ollama
+llm_model=llama3.1
+```
+
+```md
+skill_id: windows_server_ops
+type: agent
+description: "Operates Windows servers via WinRM — PowerShell execution, IIS management, event logs, service control"
+mcp_servers: [winrm]
+tags: [winrm, windows, powershell, iis, ops]
+version: "1.0"
+project_required: false
+---
+
+## Purpose
+Operate and monitor Windows servers via WinRM/PowerShell.
+Manage IIS, Windows Services, event logs, processes, and run arbitrary PowerShell.
+
+## Workflow
+1. Identify the target host from the request
+2. Call `get_system_info` on first contact to collect OS/hardware context
+3. Execute PowerShell scripts or built-in methods as needed
+4. Parse JSON output and build a structured report
+5. Suggest corrective actions for any detected issues
+
+## Available MCP Tools (WinRM)
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `exec_powershell` | `host`, `script` | Run arbitrary PowerShell — returns stdout/stderr/exit_code |
+| `exec_cmd` | `host`, `cmd`, `args[]?` | Run a classic cmd.exe command |
+| `check_service` | `host`, `service` | Get Windows service status (JSON) |
+| `restart_service` | `host`, `service` | Restart a Windows service |
+| `start_service` | `host`, `service` | Start a Windows service |
+| `stop_service` | `host`, `service` | Stop a Windows service |
+| `get_event_logs` | `host`, `log_name?`, `level?`, `count?` | Query Windows Event Logs |
+| `get_system_info` | `host` | Collect OS/CPU/RAM/disk info (persisted in DB) |
+| `get_running_processes` | `host`, `top_n?` | Top N processes by memory usage |
+| `list_services` | `host`, `status?` | List all/filtered Windows services |
+| `exec_cleanup` | `host` | Clean temp files + force GC |
+
+## Instructions
+
+**Check IIS status and restart if needed:**
+check_service:   host=<name> service=W3SVC
+restart_service: host=<name> service=W3SVC
+
+## Output Format
+Always return:
+- **Host**: name + resolved IP
+- **OS**: Windows version from `get_system_info`
+- **Status**: OK / WARNING / CRITICAL
+- **Findings**: anomalies or relevant state
+- **Actions taken**: each method called + result summary
+- **Recommendations**: next steps or escalation path
+```
+
+### Windows WinRM Agents
+ 
+| Skill | Purpose |
+|-------|---------|
+| `iis_ops` | Manage IIS — app pool lifecycle, site bindings, SSL certificates, access log analysis, FREB |
+| `windows_incident` | Triage Windows incidents — CPU/memory/disk pressure, event log errors, stuck processes, service failures |
+| `sqlserver_ops` | Monitor SQL Server — blocking queries, AG replication lag, failed jobs, index fragmentation, backup status |
+| `windows_deploy_rollback` | Deploy & rollback — robocopy staging, app pool recycle, health check, auto-rollback, backup snapshots |
+| `windows_log_analyzer` | Analyse Windows logs — Event Log queries, failed logins, lockouts, IIS W3C logs, custom app logs |
+ 
 ---
 
 ## Opensearch Guide

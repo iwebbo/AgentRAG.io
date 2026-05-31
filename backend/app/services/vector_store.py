@@ -8,6 +8,7 @@ from chromadb.config import Settings as ChromaSettings
 from typing import List, Dict, Optional, Any
 import logging
 from pathlib import Path
+import os 
 
 logger = logging.getLogger(__name__)
 
@@ -16,15 +17,41 @@ logger = logging.getLogger(__name__)
 
 class ChromaBackend:
     """ChromaDB vector store backend."""
-
+    #Fix Issue #58 Ticket
     def __init__(self, persist_directory: str = "./data/chromadb"):
-        self.persist_dir = Path(persist_directory)
-        self.persist_dir.mkdir(parents=True, exist_ok=True)
-        self.client = chromadb.PersistentClient(
-            path=str(self.persist_dir),
-            settings=ChromaSettings(anonymized_telemetry=False, allow_reset=True)
-        )
-        logger.info(f"✅ ChromaDB initialized at {self.persist_dir}")
+        chroma_host = os.getenv("CHROMA_HOST", "").strip()
+        chroma_port = int(os.getenv("CHROMA_PORT", "8001"))
+
+        if chroma_host:
+            from chromadb import AdminClient
+            admin_settings = ChromaSettings(
+                anonymized_telemetry=False,
+                chroma_api_impl="chromadb.api.fastapi.FastAPI",
+                chroma_server_host=chroma_host,
+                chroma_server_http_port=str(chroma_port),
+            )
+            # Init tenant/database (ChromaDB v2 requires explicit creation)
+            try:
+                admin = AdminClient(settings=admin_settings)
+                try:
+                    admin.get_tenant("default_tenant")
+                except Exception:
+                    admin.create_tenant("default_tenant")
+                    logger.info("✅ ChromaDB: created default_tenant")
+                try:
+                    admin.get_database("default_database", "default_tenant")
+                except Exception:
+                    admin.create_database("default_database", "default_tenant")
+                    logger.info("✅ ChromaDB: created default_database")
+            except Exception as e:
+                logger.warning(f"ChromaDB tenant/db init warning: {e}")
+
+            self.client = chromadb.HttpClient(
+                host=chroma_host,
+                port=chroma_port,
+                settings=ChromaSettings(anonymized_telemetry=False),
+            )
+            logger.info(f"✅ ChromaDB HttpClient → {chroma_host}:{chroma_port}")
 
     def _collection_name(self, project_id: str) -> str:
         return f"project_{project_id}".replace("-", "_")

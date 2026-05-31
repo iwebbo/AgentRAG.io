@@ -1,3 +1,4 @@
+# 13/04/2026 - Version stable Fix commit main
 from typing import AsyncGenerator, Optional, Dict, Any, List
 from abc import ABC, abstractmethod
 import openai

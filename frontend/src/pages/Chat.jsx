@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, Plus, Trash2, MessageSquare, FileText, Mic, Settings } from 'lucide-react';
+import { Send, Loader2, Plus, Trash2, MessageSquare, FileText, Mic, Settings, Copy, Check, RotateCcw, Download } from 'lucide-react';
 import { User, Bot } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Loading from '../components/common/Loading';
@@ -9,12 +9,14 @@ import MarkdownMessage from '../components/common/MarkdownMessage';
 import { useChatStore } from '../store/chatStore';
 import { StreamingService } from '../services/streaming';
 import api from '../services/api';
-
+import ExportButton from '../components/common/ExportButton';
+import ExportHistory from '../components/common/ExportHistory';
 /*add new featur for */
 
 const Chat = () => {
   const textareaRef = useRef(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showExportHistory, setShowExportHistory] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
   const { 
@@ -34,6 +36,7 @@ const Chat = () => {
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState(null);
   const [providers, setProviders] = useState([]);
   const [models, setModels] = useState([]);
   
@@ -245,16 +248,46 @@ const Chat = () => {
 
   const handleSend = async () => {
     if (!input.trim() || streaming) return;
+    const content = input.trim();
+    setInput('');
+    await handleSendWithContent(content);
+  };
 
-    const userMessage = input.trim();
+  const handleCopyMessage = async (content, index) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
+  const handleRetryMessage = (message, index) => {
+    if (streaming) return;
+    if (message.role === 'user') {
+      // Re-send the user message
+      setInput(message.content);
+      setTimeout(() => handleSendWithContent(message.content), 0);
+    } else {
+      // Re-generate: find the previous user message
+      const userMsg = [...messages].slice(0, index).reverse().find(m => m.role === 'user');
+      if (userMsg) {
+        handleSendWithContent(userMsg.content);
+      }
+    }
+  };
+
+  const handleSendWithContent = async (content) => {
+    if (!content.trim() || streaming) return;
     setInput('');
 
     let conversationId = currentConversation?.id;
-    
+
     if (!conversationId) {
       try {
         const newConv = await createConversation({
-          title: userMessage.substring(0, 50) + (userMessage.length > 50 ? '...' : ''),
+          title: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
           provider_name: chatSettings.provider_name,
           model: chatSettings.model,
           temperature: chatSettings.temperature,
@@ -268,22 +301,12 @@ const Chat = () => {
       }
     }
 
-    addMessage({
-      role: 'user',
-      content: userMessage,
-      created_at: new Date().toISOString()
-    });
-
-    addMessage({
-      role: 'assistant',
-      content: '',
-      created_at: new Date().toISOString()
-    });
-
+    addMessage({ role: 'user', content, created_at: new Date().toISOString() });
+    addMessage({ role: 'assistant', content: '', created_at: new Date().toISOString() });
     setStreaming(true);
 
     const request = {
-      message: userMessage,
+      message: content,
       conversation_id: conversationId,
       provider_name: chatSettings.provider_name,
       model: chatSettings.model,
@@ -293,26 +316,17 @@ const Chat = () => {
 
     await streamingService.current.startSSEStream(
       request,
-      (chunk) => {
-        updateLastMessage(chunk);
-      },
+      (chunk) => updateLastMessage(chunk),
       (error) => {
         console.error('Streaming error:', error);
         setStreaming(false);
-        streamingService.current.startWebSocketStream(request, 
+        streamingService.current.startWebSocketStream(request,
           (chunk) => updateLastMessage(chunk),
-          (error) => {
-            console.error('WebSocket error:', error);
-            setStreaming(false);
-          },
+          () => setStreaming(false),
           () => setStreaming(false)
         );
       },
-      () => {
-        setStreaming(false);
-        // Recharge juste la liste pour mettre Ã  jour updated_at
-        loadConversations();
-      }
+      () => { setStreaming(false); loadConversations(); }
     );
   };
 
@@ -523,7 +537,8 @@ const Chat = () => {
                       style={{ 
                         marginBottom: index > 0 && messages[index - 1].role === message.role 
                           ? '0.5rem' 
-                          : 'var(--spacing-4)' 
+                          : 'var(--spacing-4)',
+                        position: 'relative'
                       }}
                     >
                       <div className="chat-message-avatar">
@@ -533,14 +548,88 @@ const Chat = () => {
                           <Bot size={20} />
                         )}
                       </div>
-                      <div className="chat-message-content">
+                      <div
+                        className="chat-message-content"
+                        style={{ position: 'relative' }}
+                        onMouseEnter={(e) => {
+                          const actions = e.currentTarget.querySelector('.message-actions');
+                          if (actions) actions.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          const actions = e.currentTarget.querySelector('.message-actions');
+                          if (actions) actions.style.opacity = '0';
+                        }}
+                      >
                         {message.content ? (
-                        <MarkdownMessage 
+                          <MarkdownMessage 
                             content={message.content} 
                             isStreaming={streaming && index === messages.length - 1}
                           />
                         ) : (
                           <Loader2 className="animate-spin" size={20} style={{ color: 'var(--gray-500)' }} />
+                        )}
+                        {/* Action buttons - appear on message hover */}
+                        {message.content && !(streaming && index === messages.length - 1) && (
+                          <div
+                            className="message-actions"
+                            style={{
+                              display: 'flex',
+                              gap: '4px',
+                              marginTop: '6px',
+                              opacity: 0,
+                              transition: 'opacity 0.15s ease',
+                            }}
+                          >
+                            <button
+                              onClick={() => handleCopyMessage(message.content, index)}
+                              title="Copy"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                fontSize: 'var(--text-xs)',
+                                color: copiedIndex === index ? '#22c55e' : 'var(--gray-500)',
+                                background: 'var(--gray-100)',
+                                border: '1px solid var(--gray-200)',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: 'pointer',
+                                transition: 'color 0.15s ease',
+                              }}
+                            >
+                              {copiedIndex === index ? <Check size={12} /> : <Copy size={12} />}
+                              {copiedIndex === index ? 'Copied' : 'Copy'}
+                            </button>
+                            <button
+                              onClick={() => handleRetryMessage(message, index)}
+                              disabled={streaming}
+                              title={message.role === 'user' ? 'Retry this message' : 'Regenerate response'}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                fontSize: 'var(--text-xs)',
+                                color: 'var(--gray-500)',
+                                background: 'var(--gray-100)',
+                                border: '1px solid var(--gray-200)',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: streaming ? 'not-allowed' : 'pointer',
+                                opacity: streaming ? 0.4 : 1,
+                                transition: 'opacity 0.15s ease',
+                              }}
+                            >
+                              <RotateCcw size={12} />
+                              {message.role === 'user' ? 'Retry' : 'Regenerate'}
+                            </button>
+                              {message.role === 'assistant' && message.content && (
+                              <ExportButton
+                                content={message.content}
+                                title={message.content.trim().split(/\s+/).slice(0, 6).join(' ')}
+                                compact={false}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -599,6 +688,13 @@ const Chat = () => {
                           Templates
                         </button>
                       )}
+                        <button
+                          onClick={() => setShowExportHistory(true)}
+                          className="btn-settings-sm"
+                        >
+                          <Download size={14} />
+                          Exports
+                        </button>
                       {currentConversation && (
                         <button
                           onClick={() => handleDeleteChat(currentConversation.id)}
@@ -891,6 +987,7 @@ const Chat = () => {
           </div>
         </div>
       )}
+      <ExportHistory open={showExportHistory} onClose={() => setShowExportHistory(false)} />
     </Layout>
   );
 };

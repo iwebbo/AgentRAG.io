@@ -61,6 +61,7 @@ class BaseAgent(ABC):
         self.logs: List[Dict[str, Any]] = []
         self.tokens_used = 0
         self.mcp_calls_count: Dict[str, int] = {}
+        self.llm_conversation_id = None
         
         logger.info(f"Agent {self.agent_id} initialized with config: {config}")
     
@@ -183,48 +184,88 @@ class BaseAgent(ABC):
     ) -> str:
         """
         Appelle le LLM via LLMService.
-        
+
+        Résolution du provider (ordre de priorité) :
+          1. provider_name passé en argument
+          2. config agent : self.config["llm_provider"]
+          3. Premier provider actif en DB (trié par priority desc)
+
         Args:
             messages: Messages au format OpenAI [{"role": "...", "content": "..."}]
-            provider_name: Provider à utiliser (optionnel, utilise le premier actif)
-            model: Modèle à utiliser (optionnel, utilise celui du provider)
+            provider_name: Provider à utiliser (optionnel)
+            model: Modèle à utiliser (optionnel, override config agent + provider default)
             temperature: Température (0.0 - 1.0)
             max_tokens: Nombre max de tokens
-            
+
         Returns:
             Réponse du LLM (texte complet)
         """
         from app.models import Conversation, Message as MessageModel
         from datetime import datetime
-        
-        # Get active provider
+
+        # ── Résolution provider : arg → config agent → fallback DB ──────────
+        requested_provider = (
+            provider_name
+            or self.config.get("llm_provider")
+            or None
+        )
+        requested_model = (
+            model
+            or self.config.get("llm_model")
+            or None
+        )
+
+        logger.info(f"Requesting provider='{requested_provider}', model='{requested_model}'")
+
         provider = await self.llm_service.get_active_provider(
             user_id=self.user_id,
-            provider_name=provider_name
+            provider_name=requested_provider,
         )
-        
+
         if not provider:
-            raise ValueError(f"No active provider found (requested: {provider_name})")
+            raise ValueError(
+                f"No active provider found "
+                f"(requested: '{requested_provider}'). "
+                f"Check providers table or agent config."
+            )
+
+        # Si le provider demandé n'était pas trouvé, get_active_provider retourne
+        # le meilleur fallback — on log un warning pour visibilité.
+        if requested_provider and provider.name != requested_provider:
+            logger.warning(
+                f"Provider '{requested_provider}' not found or inactive — "
+                f"falling back to '{provider.name}' (priority={provider.priority})"
+            )
+
+        # ── Résolution model : arg/config → provider.config → erreur ─────────
+        resolved_model = (
+            requested_model
+            or provider.config.get("model")
+            or provider.config.get("default_model")
+        )
+
+        if not resolved_model:
+            raise ValueError(
+                f"No model specified for provider '{provider.name}'. "
+                f"Set 'llm_model' in agent config or 'model' in provider config."
+            )
+
+        logger.info(f"Calling LLM: provider={provider.name}, model={resolved_model}, temp={temperature}")
+
+        # Remap local pour la suite (évite de renommer toutes les occurrences)
+        model = resolved_model
         
-        # Use model from provider config if not specified
-        if not model:
-            model = provider.config.get("model") or provider.config.get("default_model")
-        
-        if not model:
-            raise ValueError(f"No model specified and no default model in provider {provider.name}")
-        
-        logger.info(f"Calling LLM: provider={provider.name}, model={model}, temp={temperature}")
-        
-        # Create temporary conversation for agent
+        # Create temporary conversation for agent (persist en DB pour stream_chat)
         conversation = Conversation(
             user_id=self.user_id,
             title=f"Agent {self.agent_id} - LLM Call",
-            provider_name=provider.name,  # ✅ FIX: Ajouter provider_name
-            model=model,                   # ✅ FIX: Ajouter model
+            provider_name=provider.name,
+            model=model,
             temperature=temperature
         )
         self.db.add(conversation)
         self.db.flush()
+        self.llm_conversation_id = conversation.id
         
         # Add messages to conversation
         for msg in messages:
