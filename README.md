@@ -115,7 +115,8 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 <img width="1719" height="911" alt="Capture d&#39;écran 2025-12-05 235210" src="https://github.com/user-attachments/assets/01661270-926b-4409-8c18-757d0210c835" />
 
 ### 6. Document Upload & Processing
-<img width="1702" height="905" alt="Capture d&#39;écran 2025-12-05 235411" src="https://github.com/user-attachments/assets/20666ce0-59f0-4a94-aab9-1b9b0448c7d1" />
+<img width="1610" height="860" alt="image" src="https://github.com/user-attachments/assets/d3fe8412-9f6f-489b-ab5f-0258ff4a4f93" />
+
 
 ---
 
