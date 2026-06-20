@@ -100,7 +100,8 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 ## Demo
 
 ### 1. Agent Dashboard
-<img width="1899" height="905" alt="image" src="https://github.com/user-attachments/assets/f51b43b5-cb34-4273-a60b-f2c8cb33592f" />
+<img width="1892" height="906" alt="image" src="https://github.com/user-attachments/assets/25bcd35f-d5fa-4480-bbd2-2a6e8919f527" />
+
 
 ### 2. Code Generator Agent in Action
 <img width="1901" height="905" alt="image" src="https://github.com/user-attachments/assets/75aa902e-be76-4fab-84dc-224215ac045c" />
