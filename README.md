@@ -122,6 +122,20 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 
 ## Features
 
+### MCP Servers
+ 
+MCP (Model Context Protocol) servers extend agent capabilities by providing structured tool access to external services. Declare servers in your agent config or `.md` frontmatter — the backend resolves credentials and routes tool calls automatically.
+ 
+| MCP Server | Key | Transport | Credential source | Tools |
+|-----------|-----|-----------|------------------|-------|
+| SSH | `ssh` | stdio | DB (encrypted) | `exec_command`, `get_system_info`, `upload_file`, `download_file`, `list_directory` |
+| WinRM | `winrm` | stdio | DB (encrypted) | `exec_powershell`, `get_system_info`, `restart_service`, `list_services`, `get_event_logs`, `get_running_processes`, `exec_cleanup` |
+| Gitea | `gitea` | HTTP | `mcp_config.gitea` | `clone_repository`, `get_repo_tree`, `get_file_content`, `update_file`, `commit_and_push`, `create_branch`, `create_pull_request` |
+| GitHub | `github` | HTTP | `mcp_config.github` | `get_file_content`, `update_file`, `create_pull_request`, `list_issues`, `create_review` |
+| DataGouv | `datagouv` | HTTP | none (public API) | `search_datasets`, `get_dataset`, `search_organizations`, `list_topics`, `get_topic` |
+| Linter | `linter` | stdio | none | `lint_file`, `format_file`, `lint_directory`, `check_syntax` |
+| Test Runner | `test_runner` | stdio | none | `run_tests`, `run_single_test`, `get_coverage` |
+ 
 ### Autonomous Agents (NEW)
 
 #### **Agent Capabilities**
@@ -144,6 +158,8 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 | **Web Search** | `websearch` | Real-time web search & synthesis | — | — |
 | **Travel Expert** | `travel_expert` | Trip planning, itinerary management | — | Travel knowledge |
 | **Email Expert** | `email_expert` | Draft, analyse and send emails via LLM | — | — |
+| **Gitea Code Generator** | `gitea_code_generator` | fixed | `gitea`, `linter` | Generate code, lint, commit and PR on self-hosted Gitea |
+| **DataGouv Explorer** | `datagouv_explorer` | fixed | `datagouv` | Search and explore the French open data catalogue |
 | **SSH Agent** | `skill` (.md) | Remote command execution on Linux/Unix hosts | SSH (DB-aware) | — |
 | **WinRM Agent** | `skill` (.md) | Remote PowerShell execution on Windows hosts | WinRM (DB-aware) | — |
 | **Skill Agent** | `skill` | Any custom agent defined via `.md` frontmatter | Any registered MCP | Any project |
