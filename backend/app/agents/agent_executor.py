@@ -22,6 +22,8 @@ from app.mcp.servers.test_runner_server import TestRunnerMCP
 from app.mcp.servers.linter_server import LinterMCP
 from app.mcp.servers.ssh_server import SSHMCPServer
 from app.mcp.servers.winrm_server import WinRMMCPServer
+from app.mcp.servers.gitea_server import GiteaMCPServer
+from app.mcp.servers.datagouv_server import DataGouvMCPServer
 
 # ── Agent imports ─────────────────────────────────────────────────────────────
 from app.agents.agent_types.branch_code_review_agent import BranchCodeReviewAgent
@@ -32,6 +34,9 @@ from app.agents.agent_types.travel_agent import TravelAdvisorAgent
 from app.agents.agent_types.email_agent import EmailAgent
 from app.agents.agent_types.websearch_agent import WebSearchAgent
 from app.agents.agent_types.skill_agent import SkillAgent
+from app.agents.agent_types.gitea_code_generator_agent import GiteaCodeGeneratorAgent
+from app.agents.agent_types.datagouv_agent import DataGouvAgent
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +51,8 @@ MCP_REGISTRY: Dict[str, Type] = {
     "test_runner": TestRunnerMCP,
     "ssh":         SSHMCPServer,
     "winrm":       WinRMMCPServer,
-    # Futurs :
-    # "blender":   BlenderMCPServer,
-    # "gouv_fr":   GouvFrMCPServer,
+    "gitea":       GiteaMCPServer,
+    "datagouv":    DataGouvMCPServer,
 }
 
 
@@ -63,6 +67,8 @@ class AgentExecutor:
         "email_expert":        EmailAgent,
         "websearch":           WebSearchAgent,
         "skill":               SkillAgent,
+        "gitea_code_generator": GiteaCodeGeneratorAgent,
+        "datagouv_explorer":   DataGouvAgent,
     }
 
     def __init__(self, db: Session):
@@ -114,6 +120,10 @@ class AgentExecutor:
                 db=self.db,
             )
             agent_instance.mcp_client = mcp_client
+
+            if input_data.get("conversation_id"):
+                from uuid import UUID as _UUID
+                agent_instance.conversation_id = _UUID(input_data["conversation_id"])
 
             logger.info(
                 f"Executing agent '{agent_record.name}' "

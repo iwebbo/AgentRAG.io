@@ -252,7 +252,7 @@ const Dashboard = () => {
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 height: '32px', padding: '0 14px',
                 borderRadius: 'var(--radius)',
-                background: 'var(--gray-900)', color: 'white',
+                background: 'var(--primary)', color: 'white',
                 border: 'none',
                 fontSize: '12px', fontWeight: '500',
                 cursor: 'pointer', transition: 'opacity 0.12s',

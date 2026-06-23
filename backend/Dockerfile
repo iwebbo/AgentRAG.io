@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     git \
+    libpango-1.0-0 libpangoft2-1.0-0 libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements

@@ -175,6 +175,8 @@ class LLMService:
         full_response = ""
         try:
             logger.info(f"Starting LLM streaming...")
+            logger.info("Reasoning mode: %s (user input)", reasoning_mode)
+            logger.info("Fallback reasoning mode: %s", conversation.reasoning_mode)
             async for chunk in llm_provider.stream_completion(
                 messages=messages,
                 model=model or conversation.model,
@@ -209,7 +211,7 @@ class LLMService:
                 role="assistant",
                 content=full_response,
                 latency_ms=latency_ms,
-                tokens_used=assistant_tokens  # Ã¢Å“â€¦ AJOUTÃƒâ€°
+                tokens_used=assistant_tokens  # 
             )
             self.db.add(assistant_message)
             

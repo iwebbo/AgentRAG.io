@@ -39,7 +39,7 @@ const RAGChat = () => {
     provider_name: 'ollama',
     model: 'llama2',
     temperature: 0.7,
-    reasoning_mode: 'standard',
+    reasoning_mode: 'auto',
     top_k: 5
   });
 

@@ -441,7 +441,7 @@ async def rag_chat_stream(
     context_limit = get_model_limit(request.model)
     logger.info(f"🧠 Model: {request.model} → Context limit: {context_limit:,} tokens")
     
-    # ✅ NOUVEAU: top_k adaptatif selon stratégie ET modèle
+    # feature/Ticket#55: top_k adaptatif selon stratégie ET modèle
     adaptive_top_k = strategy["top_k"]
     
     # Ajuster selon capacité modèle
@@ -489,7 +489,7 @@ async def rag_chat_stream(
     rag_context_parts = []
     rag_tokens = 0
     
-    # ✅ NOUVEAU: Ajout index projet si demandé
+    #  Ajout index projet si demandé
     if strategy["include_index"]:
         project_index = generate_project_index(request.project_id)
         if project_index:
@@ -498,7 +498,6 @@ async def rag_chat_stream(
             logger.info(f"📇 Index projet ajouté: {rag_tokens} tokens")
     
     # Limite contexte RAG basée sur stratégie
-    ### ?????
     max_rag_tokens = int(context_limit * strategy["context_ratio"])
     
     if retrieval_results['documents'][0]:

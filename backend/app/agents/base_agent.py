@@ -61,6 +61,7 @@ class BaseAgent(ABC):
         self.logs: List[Dict[str, Any]] = []
         self.tokens_used = 0
         self.mcp_calls_count: Dict[str, int] = {}
+        self.conversation_id: Optional[UUID] = None 
         self.llm_conversation_id = None
         
         logger.info(f"Agent {self.agent_id} initialized with config: {config}")
@@ -180,7 +181,8 @@ class BaseAgent(ABC):
         provider_name: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 2000
+        max_tokens: int = 2000,
+        conversation_id: Optional[UUID] = None
     ) -> str:
         """
         Appelle le LLM via LLMService.
@@ -256,27 +258,40 @@ class BaseAgent(ABC):
         model = resolved_model
         
         # Create temporary conversation for agent (persist en DB pour stream_chat)
-        conversation = Conversation(
-            user_id=self.user_id,
-            title=f"Agent {self.agent_id} - LLM Call",
-            provider_name=provider.name,
-            model=model,
-            temperature=temperature
-        )
-        self.db.add(conversation)
-        self.db.flush()
-        self.llm_conversation_id = conversation.id
-        
-        # Add messages to conversation
-        for msg in messages:
-            db_message = MessageModel(
-                conversation_id=conversation.id,
-                role=msg["role"],
-                content=msg["content"]
+        target_conv_id = conversation_id or self.llm_conversation_id
+
+        if target_conv_id:
+            conversation = self.db.query(Conversation).filter(
+                Conversation.id == target_conv_id,
+                Conversation.user_id == self.user_id
+            ).first()
+            if not conversation:
+                raise ValueError(f"Conversation {target_conv_id} not found or unauthorized")
+            for msg in messages:
+                self.db.add(MessageModel(
+                    conversation_id=conversation.id,
+                    role=msg["role"],
+                    content=msg["content"]
+                ))
+            self.db.commit()
+        else:
+            conversation = Conversation(
+                user_id=self.user_id,
+                title=f"Agent {self.agent_id} - LLM Call",
+                provider_name=provider.name,
+                model=model,
+                temperature=temperature
             )
-            self.db.add(db_message)
-        
-        self.db.commit()
+            self.db.add(conversation)
+            self.db.flush()
+            self.llm_conversation_id = conversation.id  # ← déjà là dans ton code
+            for msg in messages:
+                self.db.add(MessageModel(
+                    conversation_id=conversation.id,
+                    role=msg["role"],
+                    content=msg["content"]
+                ))
+            self.db.commit()
         
         # Call LLM via streaming (but collect full response)
         full_response = ""

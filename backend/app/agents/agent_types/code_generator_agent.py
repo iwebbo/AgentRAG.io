@@ -317,11 +317,12 @@ class CodeGeneratorAgent(BaseAgent):
         # Check si project existe déjà pour ce repo
         existing = self.db.query(Project).filter(
             Project.user_id == self.user_id,
-            Project.name == f"CodeGen: {self.repo}"
+            Project.name == f"AgentCodeGenerator: {self.repo}"
         ).first()
         
         if existing:
             self.log("info", f"Using existing project {existing.id}")
+            self.project_id = str(existing.id) 
             return existing
         
         # Créer nouveau project
@@ -334,6 +335,7 @@ class CodeGeneratorAgent(BaseAgent):
         self.db.flush()
         
         self.log("info", f"Created new project {project.id}")
+        self.project_id = str(project.id)
         
         # Fetch repo content via GitHub MCP et embed
         await self._embed_repository(project.id)
@@ -376,47 +378,51 @@ class CodeGeneratorAgent(BaseAgent):
                     file_path = file_info["path"]
                     
                     # Fetch file content via GitHub MCP (méthode EXISTANTE)
-                    content_data = await self.call_mcp("github", "get_file_content", {
-                        "repo": self.repo,
-                        "path": file_path,
-                        "ref": self.base_branch
-                    })
-                    
+                    try:
+                        content_data = await self.call_mcp("github", "get_file_content", {
+                            "repo": self.repo,
+                            "path": file_path,
+                            "ref": self.base_branch
+                        })
+                    except Exception:
+                        continue
+ 
                     content = content_data.get("content", "")
-                    
                     if not content:
                         continue
-                    
+ 
                     # Detect language
                     language = self._detect_language(file_path)
-                    
-                    # Create document in project
+ 
+                    # Create document in project — champs réels du modèle Document
                     doc = Document(
                         project_id=project_id,
-                        name=file_path,
-                        content=content,
-                        metadata={
-                            "path": file_path,
-                            "language": language,
-                            "repo": self.repo,
-                            "size": len(content)
-                        }
+                        filename=file_path,
+                        file_path=f"git://{self.repo}/{file_path}",
+                        file_type=language,
+                        file_size=len(content.encode("utf-8")),
+                        chunk_count=1,
+                        total_tokens=len(content) // 4,
+                        status="completed",
                     )
                     self.db.add(doc)
                     self.db.flush()
-                    
-                    # Embed via vector store
-                    query_embedding = self.embeddings.encode_single(content)
-                    self.vector_store.add(
+ 
+                    # Embed via vector store — méthode réelle : add_documents()
+                    embedding = self.embeddings.encode_single(content)
+                    self.vector_store.add_documents(
                         project_id=str(project_id),
-                        document_id=str(doc.id),
-                        text=content,
-                        embedding=query_embedding,
-                        metadata={
-                            "path": file_path,
-                            "language": language
-                        }
+                        documents=[content],
+                        embeddings=[embedding],
+                        metadatas=[{
+                            "path":     file_path,
+                            "language": language,
+                            "repo":     self.repo,
+                            "doc_id":   str(doc.id),
+                        }],
+                        ids=[str(doc.id)],
                     )
+
             
             self.db.commit()
             self.log("info", f"Embedded {len(code_files)} files into RAG")
@@ -542,7 +548,7 @@ Generate the necessary code changes following the repository's patterns and best
                 provider_name=self.llm_provider,
                 model=self.llm_model,
                 temperature=self.llm_temperature,
-                max_tokens=4000
+                max_tokens=8000
             )
             
             # Parse JSON response
@@ -607,25 +613,23 @@ CRITICAL: Return complete file contents in "content", not diffs or snippets."""
         return prompt
     
     def _parse_code_response(self, response: str) -> Dict[str, Any]:
-        """Parse la réponse JSON du LLM."""
         # Clean markdown fences
         clean = re.sub(r'```json\s*|\s*```', '', response).strip()
         
         try:
-            parsed = json.loads(clean)
-            
-            if not isinstance(parsed, dict) or "changes" not in parsed:
-                raise ValueError("Invalid response format")
-            
-            if not isinstance(parsed["changes"], list):
-                raise ValueError("'changes' must be a list")
-            
-            return parsed
-            
-        except json.JSONDecodeError as e:
-            self.log("error", f"Failed to parse JSON response: {str(e)}")
-            raise ValueError(f"Invalid JSON from LLM: {str(e)}")
-    
+            return json.loads(clean)
+        except json.JSONDecodeError:
+            # Tentative de récupération si JSON tronqué
+            try:
+                # Fermer les structures ouvertes
+                clean = clean.rstrip()
+                if not clean.endswith('}'):
+                    clean += '"}]}' 
+                return json.loads(clean)
+            except json.JSONDecodeError as e:
+                self.log("error", f"Failed to parse JSON response: {str(e)}")
+                raise ValueError(f"Invalid JSON from LLM: {str(e)}")
+        
     async def _apply_changes(
         self,
         repo_path: str,

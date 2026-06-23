@@ -5,10 +5,15 @@ from typing import List
 from uuid import UUID
 from datetime import datetime
 import logging
+import json
+import asyncio
+from uuid import uuid4
 
+from fastapi.responses import StreamingResponse
 from app.database import get_db
 from app.models import User
 from app.models.agent import Agent, AgentExecution
+from app.models.conversation import Conversation
 from app.dependencies import get_current_user
 from app.schemas.agent import (
     AgentCreate,
@@ -258,6 +263,85 @@ async def toggle_agent_status(
 
 # ============= AGENT EXECUTION =============
 
+@router.post("/{agent_id}/execute/stream")
+async def execute_agent_stream(
+    agent_id: UUID,
+    execution_data: AgentExecutionCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Stream SSE de l'exécution d'un agent avec résultat sauvegardé en conversation."""
+    agent = db.query(Agent).filter(
+        Agent.id == agent_id,
+        Agent.user_id == current_user.id
+    ).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if not agent.is_active:
+        raise HTTPException(status_code=400, detail="Agent is not active")
+
+    # Créer la conversation dédiée à cette exécution
+    conversation = Conversation(
+        user_id=current_user.id,
+        title=f"[Agent] {agent.name}",
+        provider_name=agent.config.get("llm_provider", "ollama"),
+        model=agent.config.get("llm_model", ""),
+        temperature=agent.config.get("llm_temperature", 0.7),
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+
+    # Injecter conversation_id dans input_data pour que l'agent l'utilise
+    input_data = dict(execution_data.input_data or {})
+    input_data["conversation_id"] = str(conversation.id)
+
+    # Créer l'execution record
+    execution = AgentExecution(
+        agent_id=agent_id,
+        status="pending",
+        trigger=execution_data.trigger,
+        input_data=input_data,
+        started_at=datetime.utcnow()
+    )
+    db.add(execution)
+    db.commit()
+    db.refresh(execution)
+
+    async def event_generator():
+        from app.agents.agent_executor import AgentExecutor
+        executor = AgentExecutor(db)
+
+        # Envoyer conversation_id immédiatement au client
+        yield f"event: init\ndata: {json.dumps({'conversation_id': str(conversation.id), 'execution_id': str(execution.id)})}\n\n"
+
+        try:
+            async for update in executor.execute_agent(
+                agent_id=agent_id,
+                execution_id=execution.id,
+                input_data=input_data
+            ):
+                event_type = update.get("type", "log")
+                yield f"event: {event_type}\ndata: {json.dumps(update)}\n\n"
+                await asyncio.sleep(0)  # yield control
+
+            db.refresh(execution)
+            yield f"event: done\ndata: {json.dumps({'execution_id': str(execution.id), 'conversation_id': str(conversation.id), 'status': execution.status, 'output': execution.output_data})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Stream execution failed: {e}")
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
 @router.post("/{agent_id}/execute", response_model=AgentExecutionResponse)
 async def execute_agent(
     agent_id: UUID,
@@ -324,7 +408,6 @@ async def execute_agent(
         db.refresh(execution)
     
     return execution
-
 
 @router.get("/{agent_id}/executions", response_model=List[AgentExecutionListResponse])
 async def list_agent_executions(
