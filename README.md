@@ -1,8 +1,9 @@
 <img width="600" height="600" alt="agentragio" src="https://github.com/user-attachments/assets/93dfaf79-24a1-439b-9c63-724917a30554" />
 
-# AgentRAG.io - Intelligent RAG with Autonomous Agents
+# AgentRAG.io
+**AgentRAG.io is a self-hosted, a RAG-Powered Intelligence, a MCP Integration, multi-provider platform featuring SSH & WinRM remote execution. It allows you to modularize your infrastructure and operational workflows by instantiating complex autonomous agents using a single file.**
 
-**Enterprise RAG platform with MCP-powered autonomous agents for SSH Admin, Win Admin, code generation, legal advisory, accounting, and more - like OpenClaw**
+[![.MD](https://img.shields.io/badge/Documentation-Example_of_Skills_.md-blue?style=for-the-badge&logo=markdown)](https://iwebbo.github.io/products/agentrag.html)
 
 ![License](https://img.shields.io/badge/MIT-00599C?style=for-the-badge&logo=MIT&logoColor=black)
 ![Python](https://img.shields.io/badge/Python-4EAA25?style=for-the-badge&logo=Python&logoColor=black)
