@@ -158,6 +158,8 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 | **Travel Expert** | `travel_expert` | Trip planning, itinerary management | — | Travel knowledge |
 | **Email Expert** | `email_expert` | Draft, analyse and send emails via LLM | — | — |
 | **Gitea Code Generator** | `gitea_code_generator` | fixed | `gitea`, `linter` | Generate code, lint, commit and PR on self-hosted Gitea |
+| **Gitea Ansible Role Generator** | `gitea_ansible_role_generator` | fixed | `gitea`, `linter` | Generate Role Ansible, lint, commit and PR on self-hosted Gitea |
+| **Git Ansible Role Generator** | `ansible_role_generator` | fixed | `git`, `linter` | Generate Role Ansible, lint, commit and PR on self-hosted GitHub |
 | **DataGouv Explorer** | `datagouv_explorer` | fixed | `datagouv` | Search and explore the French open data catalogue |
 | **SSH Agent** | `skill` (.md) | Remote command execution on Linux/Unix hosts | SSH (DB-aware) | — |
 | **WinRM Agent** | `skill` (.md) | Remote PowerShell execution on Windows hosts | WinRM (DB-aware) | — |
