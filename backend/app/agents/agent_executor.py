@@ -36,6 +36,8 @@ from app.agents.agent_types.websearch_agent import WebSearchAgent
 from app.agents.agent_types.skill_agent import SkillAgent
 from app.agents.agent_types.gitea_code_generator_agent import GiteaCodeGeneratorAgent
 from app.agents.agent_types.datagouv_agent import DataGouvAgent
+from app.agents.agent_types.ansible_role_generator_agent import AnsibleRoleGeneratorAgent
+from app.agents.agent_types.gitea_ansible_role_generator_agent import GiteaAnsibleRoleGeneratorAgent
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +71,8 @@ class AgentExecutor:
         "skill":               SkillAgent,
         "gitea_code_generator": GiteaCodeGeneratorAgent,
         "datagouv_explorer":   DataGouvAgent,
+        "ansible_role_generator":        AnsibleRoleGeneratorAgent,
+        "gitea_ansible_role_generator":  GiteaAnsibleRoleGeneratorAgent,
     }
 
     def __init__(self, db: Session):

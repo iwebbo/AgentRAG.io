@@ -120,6 +120,52 @@ const AGENT_TYPES = {
       { name: 'test_mode', label: 'Test mode (dry-run, no commit)', type: 'checkbox', defaultValue: false }
     ]
   },
+  ansible_role_generator: {
+  name: 'Ansible Role Generator',
+  description: 'Scaffold and push a complete Ansible role (Galaxy structure) to a GitHub repo via MCP',
+  icon: '⚙', color: '#3b82f6', badge: 'fixed', mcp: ['github', 'linter'],
+  defaultConfig: (providers) => ({
+    mcp_servers: ['github', 'linter'],
+    llm_provider: providers[0]?.name || 'lmstudio',
+    llm_model: 'openai/gpt-oss-20b',
+    llm_temperature: 0.2,
+    base_branch: 'main',
+    auto_lint: true,
+    auto_commit: true,
+    auto_create_pr: false,
+    roles_path: 'roles',
+    }),
+    mcpConfig: { github: { token: '', repo: '' } },
+    requiredFields: ['github.token', 'github.repo'],
+    executeFields: [
+      { name: 'role_name', label: 'Role name', type: 'text', required: true, placeholder: 'nginx_hardening' },
+      { name: 'description', label: 'Description', type: 'textarea', required: true },
+      { name: 'supported_os', label: 'Supported OS (comma-separated)', type: 'text', placeholder: 'Debian, RedHat' },
+    ],
+  },
+  gitea_ansible_role_generator: {
+    name: 'Gitea Ansible Role Generator',
+    description: 'Scaffold and push a complete Ansible role (Galaxy structure) to a self-hosted Gitea repo via MCP',
+    icon: '⚙', color: '#f97316', badge: 'fixed', mcp: ['gitea', 'linter'],
+    defaultConfig: (providers) => ({
+      mcp_servers: ['gitea', 'linter'],
+      llm_provider: providers[0]?.name || 'lmstudio',
+      llm_model: 'openai/gpt-oss-20b',
+      llm_temperature: 0.2,
+      base_branch: 'main',
+      auto_lint: true,
+      auto_commit: true,
+      auto_create_pr: false,
+      roles_path: 'roles',
+    }),
+    mcpConfig: { gitea: { url: '', token: '', repo: '' } },
+    requiredFields: ['gitea.url', 'gitea.token', 'gitea.repo'],
+    executeFields: [
+      { name: 'role_name', label: 'Role name', type: 'text', required: true, placeholder: 'nginx_hardening' },
+      { name: 'description', label: 'Description', type: 'textarea', required: true },
+      { name: 'supported_os', label: 'Supported OS (comma-separated)', type: 'text', placeholder: 'Debian, RedHat' },
+    ],
+  },
   datagouv_explorer: {
     name: 'DataGouv Explorer',
     description: 'Explore the data.gouv.fr catalogue — datasets, resources, organizations, DINUM topics',
@@ -739,6 +785,14 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
       if (d.page_size) r.page_size = parseInt(d.page_size);
       if (d.sort) r.sort = d.sort;
       return r;
+    }
+    if (agent.agent_type === 'ansible_role_generator' || agent.agent_type === 'gitea_ansible_role_generator') {
+      return {
+        role_name: d.role_name,
+        description: d.description,
+        supported_os: d.supported_os ? d.supported_os.split(',').map(s => s.trim()).filter(Boolean) : ['Debian', 'RedHat'],
+        test_mode: d.test_mode ?? false,
+      };
     }
     return {};
   };
@@ -1675,7 +1729,7 @@ const Agents = () => {
                     </div>
                   )}
 
-                  {['branch_code_review', 'code_generator'].includes(selectedAgentType) && (
+                  {['branch_code_review', 'code_generator', 'ansible_role_generator'].includes(selectedAgentType) && (
                     <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
                       <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>GitHub configuration</h3>
                       <div className="form-group"><label className="form-label">GitHub token * <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>Required for code operations</span></label><input type="password" className="form-input" value={formData.mcp_config.github?.token || ''} onChange={e => updateConfigField('mcp_config.github.token', e.target.value)} placeholder="ghp_..." /></div>
@@ -1683,7 +1737,7 @@ const Agents = () => {
                     </div>
                   )}
 
-                  {selectedAgentType === 'gitea_code_generator' && (
+                  {['gitea_code_generator', 'gitea_ansible_role_generator'].includes(selectedAgentType) && (
                     <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
                       <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>Gitea configuration</h3>
                       <div className="form-group"><label className="form-label">Gitea URL *</label><input type="text" className="form-input" value={formData.mcp_config.gitea?.url || ''} onChange={e => updateConfigField('mcp_config.gitea.url', e.target.value)} placeholder="http://gitea.example.local:3000" /></div>
