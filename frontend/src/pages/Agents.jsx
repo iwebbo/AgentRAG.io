@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ChevronDown, ChevronUp, Send, Loader2, Bot, User, Copy, Check, ExternalLink, History, MessageCircle } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Send, Loader2, Bot, User, Copy, Check, ExternalLink, History, MessageCircle, Settings } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import Loading from '../components/common/Loading';
@@ -181,12 +181,135 @@ const AGENT_TYPES = {
       { name: 'page_size', label: 'Page size', type: 'number', placeholder: '10' },
       { name: 'sort', label: 'Sort (search: -created | -last_update | views…)', type: 'text', placeholder: '-last_update' }
     ]
+  },
+wikijs: {
+    name: 'WikiJS Assistant',
+    description: 'Read, search, create and update Wiki.js documentation pages, powered by a local LLM',
+    icon: '⌬', color: '#16a34a', badge: 'fixed', mcp: ['wikijs'],
+    defaultConfig: (providers) => ({
+      mcp_servers: ['wikijs'],
+      mode: 'read',
+      default_locale: 'en',
+      default_tags: [],
+      llm_provider: providers[0]?.name || 'lmstudio',
+      llm_model: 'openai/gpt-oss-20b',
+      llm_temperature: 0.3,
+    }),
+    mcpConfig: { wikijs: { base_url: '', token: '' } },
+    requiredFields: ['wikijs.base_url', 'wikijs.token'],
+    executeFields: [
+      { name: 'mode', label: 'Mode', type: 'select', required: true, options: [
+          { value: 'search', label: 'search — full-text search' },
+          { value: 'read', label: 'read — load page + LLM analysis' },
+          { value: 'create', label: 'create — generate new page via LLM' },
+          { value: 'update', label: 'update — revise existing page via LLM' },
+        ], defaultValue: 'read' },
+      { name: 'query', label: 'Search query (mode: search)', type: 'text', placeholder: 'installation' },
+      { name: 'path', label: 'Page path (modes: read / create / update)', type: 'text', placeholder: 'mqtt-install' },
+      { name: 'title', label: 'Page title (mode: create)', type: 'text', placeholder: 'Installation MQTT Debian' },
+      { name: 'prompt', label: 'Generation prompt (mode: create)', type: 'textarea', placeholder: 'Explain in 3 points how to install and configure X...' },
+      { name: 'instruction', label: 'Update instruction (mode: update)', type: 'textarea', placeholder: 'Add a "Troubleshooting" section at the bottom...' },
+      { name: 'question', label: 'Question (mode: read, optional)', type: 'text', placeholder: 'How is SSL configured here?' },
+      { name: 'context', label: 'Context (modes: create / update, optional)', type: 'textarea', placeholder: 'Paste logs, config files, bash history...' },
+      { name: 'tags', label: 'Tags, comma-separated (mode: create, optional)', type: 'text', placeholder: 'infra, installation' },
+      { name: 'locale', label: 'Locale override (optional)', type: 'text', placeholder: 'en' },
+    ]
   }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOC ENTRIES
 // ─────────────────────────────────────────────────────────────────────────────
+const SKILL_MD_EXAMPLES = [
+  {
+    key: 'web_server_ops',
+    filename: 'web_server_ops.md',
+    content: `---
+skill_id: web_server_ops
+name: web_server_ops
+type: agent
+mcp_servers: [ssh]
+description: "Ops serveurs web nginx/apache"
+version: "1.0"
+tags: [nginx,apache,web,ssh]
+---
+## Mapping
+- reload nginx     → nginx -t && systemctl reload nginx
+- logs access      → tail -n 100 /var/log/nginx/access.log
+- logs error       → tail -n 100 /var/log/nginx/error.log
+- config nginx     → cat /etc/nginx/nginx.conf
+- check sites      → ls /etc/nginx/sites-enabled/
+- status           → systemctl status nginx --no-pager
+## Format
+✅ Succès | ⚠️ Warning | ❌ Erreur + stderr + fix`
+  },
+  {
+    key: 'k8s_ops',
+    filename: 'k8s_ops.md',
+    content: `---
+skill_id: k8s_ops
+name: k8s_ops
+type: agent
+mcp_servers: [ssh]
+description: "Ops noeuds Kubernetes via kubectl"
+version: "1.0"
+tags: [kubernetes,k8s,kubectl,ssh]
+---
+## Mapping
+- pods             → kubectl get pods -A
+- logs <pod>       → kubectl logs <pod> --tail=50
+- describe <pod>   → kubectl describe pod <pod>
+- nodes            → kubectl get nodes -o wide
+- drain <node>     → kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
+- events           → kubectl get events --sort-by=.lastTimestamp -A | tail -20
+## Format
+✅ Succès | ⚠️ Warning | ❌ Erreur + stderr + fix`
+  },
+  {
+    key: 'postgres_ops',
+    filename: 'postgres_ops.md',
+    content: `---
+skill_id: postgres_ops
+name: postgres_ops
+type: agent
+mcp_servers: [ssh]
+description: "Ops base PostgreSQL via psql"
+version: "1.0"
+tags: [postgres,postgresql,db,sql,ssh]
+---
+## Mapping
+- status           → systemctl status postgresql --no-pager
+- restart          → systemctl restart postgresql
+- connexions       → psql -U postgres -c "SELECT count(*), state FROM pg_stat_activity GROUP BY state"
+- taille bases     → psql -U postgres -c "SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database ORDER BY pg_database_size(datname) DESC"
+- locks            → psql -U postgres -c "SELECT pid, usename, application_name, state, wait_event_type, query FROM pg_stat_activity WHERE wait_event_type='Lock'"
+- slow queries     → psql -U postgres -c "SELECT pid, now()-query_start AS duration, query FROM pg_stat_activity WHERE state='active' ORDER BY duration DESC LIMIT 10"
+- vacuum           → psql -U postgres -c "VACUUM ANALYZE"
+- logs             → tail -n 100 /var/log/postgresql/postgresql-*.log
+- disk             → df -h /var/lib/postgresql
+## Format
+✅ Succès | ⚠️ Warning | ❌ Erreur + stderr psql + fix`
+  }
+];
+
+const SKILL_REGISTER_CURL = `curl -X POST https://<host>/api/skills/register \\
+  -H "Authorization: Bearer <token>" \\
+  -F "file=@web_server_ops.md" \\
+  -F "auto_create_agent=true" \\
+  -F "llm_provider=lmstudio" \\
+  -F "llm_model=openai/gpt-oss-20b"`;
+
+const MCP_SERVERS_STATIC = [
+  { key: 'ssh',         transport: 'stdio', credential: 'DB (encrypted)',       tools: 'exec_command, get_system_info, upload_file, download_file, list_directory' },
+  { key: 'winrm',       transport: 'stdio', credential: 'DB (encrypted)',       tools: 'exec_powershell, get_system_info, restart_service, list_services, get_event_logs, get_running_processes, exec_cleanup' },
+  { key: 'gitea',       transport: 'HTTP',  credential: 'mcp_config.gitea',     tools: 'clone_repository, get_repo_tree, get_file_content, update_file, commit_and_push, create_branch, create_pull_request' },
+  { key: 'github',      transport: 'HTTP',  credential: 'mcp_config.github',    tools: 'get_file_content, update_file, create_pull_request, list_issues, create_review' },
+  { key: 'datagouv',    transport: 'HTTP',  credential: 'none (public API)',    tools: 'search_datasets, get_dataset, search_organizations, list_topics, get_topic' },
+  { key: 'wikijs',      transport: 'HTTP',  credential: 'mcp_config.wikijs',    tools: 'search_pages, get_page, create_page, update_page' },
+  { key: 'linter',      transport: 'stdio', credential: 'none',                 tools: 'lint_file, format_file, lint_directory, check_syntax' },
+  { key: 'test_runner', transport: 'stdio', credential: 'none',                 tools: 'run_tests, run_single_test, get_coverage' },
+];
+
 const DOC_ENTRIES = [
   {
     key: 'skill', icon: '⌥', title: 'Skill agents (SSH / WinRM / Ops)',
@@ -199,32 +322,25 @@ const DOC_ENTRIES = [
     ]
   },
   {
-    key: 'gitea_code_generator', icon: '⟐', title: 'Gitea Code Generator',
-    desc: 'Fixed agent backed by MCP Gitea + Linter. Clones the repo, generates or modifies code, lints, commits to a feature branch, and optionally creates a PR.',
-    steps: [
-      { n: 1, text: 'Create the agent with mcp_config.gitea = { url, token, repo }. The token comes from Gitea → Settings → Applications.' },
-      { n: 2, text: 'Set base_branch (default: main) and target_branch (default: ai-feature). The AI always works on target_branch, never on main.' },
-      { n: 3, text: 'Execute with a prompt describing the change. Toggle auto_lint, auto_commit, auto_create_pr as needed.' },
-      { n: 4, text: 'Use test_mode: true for a dry-run (generates code but does not commit).' }
-    ]
-  },
-  {
-    key: 'datagouv_explorer', icon: '⊗', title: 'DataGouv Explorer',
-    desc: 'Fixed agent backed by MCP DataGouv. Supports 4 modes: search (datasets), dataset (detail + resources), organization (orgs), topic (DINUM API v2 themes).',
-    steps: [
-      { n: 1, text: 'mode=search + query → paginated dataset list. Supports sort (-created, -last_update, views…), tag and organization filters.' },
-      { n: 2, text: 'mode=dataset + dataset_id (slug or ID) → full dataset info + download URLs for each resource.' },
-      { n: 3, text: 'mode=organization + query (or org_id for direct fetch) → org info and dataset count.' },
-      { n: 4, text: 'mode=topic (+ topic_id for a specific topic) → DINUM API v2 thematic groups. Leave topic_id empty to list all.' }
-    ]
+    key: 'skill_examples', icon: '📄', title: 'Skill .md examples — ready-to-register templates',
+    desc: 'Copy one of these, adjust the ## Mapping to your infra, then register it via POST /api/skills/register (multipart form, see curl below).',
+    curl: SKILL_REGISTER_CURL,
+    examples: SKILL_MD_EXAMPLES
   },
   {
     key: 'reference', icon: '⌬', title: 'Agent types reference',
     desc: 'All agent_type keys, their badge (fixed / skill), MCP servers used and execute payload shape.',
+    columns: ['agent_type', 'name', 'badge', 'MCP servers'],
     table: Object.entries(AGENT_TYPES).map(([key, t]) => ({ key, name: t.name, badge: t.badge, mcp: t.mcp.join(', ') || '—' }))
+  },
+  {
+    key: 'mcp_servers', icon: '🔌', title: 'Available MCP servers',
+    desc: 'Static reference — there is currently no DB-backed endpoint listing registered MCP servers, so this table is maintained manually in code and may drift from the actual backend deployment. Cross-check with the backend MCP registry if in doubt.',
+    static: true,
+    columns: ['key', 'transport', 'credential', 'tools'],
+    table: MCP_SERVERS_STATIC
   }
 ];
-
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -394,6 +510,103 @@ const SkillExecuteFields = ({ executeData, onChange, hosts }) => (
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AGENT CONFIG FIELDS — partagé entre Create et Edit
+// ─────────────────────────────────────────────────────────────────────────────
+const AgentConfigFields = ({ agentType, formData, providers, skills, updateConfigField }) => (
+  <>
+    <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+      <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>LLM configuration</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Provider</label>
+          <select className="form-input" value={formData.config.llm_provider} onChange={e => updateConfigField('config.llm_provider', e.target.value)}>
+            {providers.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group"><label className="form-label">Model</label><input type="text" className="form-input" value={formData.config.llm_model} onChange={e => updateConfigField('config.llm_model', e.target.value)} /></div>
+        <div className="form-group"><label className="form-label">Temperature</label><input type="number" step="0.1" min="0" max="2" className="form-input" value={formData.config.llm_temperature} onChange={e => updateConfigField('config.llm_temperature', parseFloat(e.target.value))} /></div>
+      </div>
+    </div>
+
+    {agentType === 'skill' && (
+      <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+        <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>Skill configuration</h3>
+        <div className="form-group">
+          <label className="form-label">Default skill</label>
+          <select className="form-input" value={formData.config.skill_id || ''} onChange={e => updateConfigField('config.skill_id', e.target.value)}>
+            <option value="">— auto-detect —</option>
+            {skills.map(s => <option key={s.skill_id} value={s.skill_id}>{s.skill_id} — {s.description}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Memory scope</label>
+          <select className="form-input" value={formData.config.memory_scope || 'session+global'} onChange={e => updateConfigField('config.memory_scope', e.target.value)}>
+            <option value="session+global">session+global</option>
+            <option value="session">session only</option>
+            <option value="global">global only</option>
+            <option value="none">none</option>
+          </select>
+        </div>
+      </div>
+    )}
+
+    {['branch_code_review', 'code_generator', 'ansible_role_generator'].includes(agentType) && (
+      <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+        <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>GitHub configuration</h3>
+        <div className="form-group"><label className="form-label">GitHub token *</label><input type="password" className="form-input" value={formData.mcp_config.github?.token || ''} onChange={e => updateConfigField('mcp_config.github.token', e.target.value)} placeholder="ghp_..." /></div>
+        <div className="form-group"><label className="form-label">Repository *</label><input type="text" className="form-input" value={formData.mcp_config.github?.repo || ''} onChange={e => updateConfigField('mcp_config.github.repo', e.target.value)} placeholder="username/repository" /></div>
+      </div>
+    )}
+
+    {['gitea_code_generator', 'gitea_ansible_role_generator'].includes(agentType) && (
+      <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+        <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>Gitea configuration</h3>
+        <div className="form-group"><label className="form-label">Gitea URL *</label><input type="text" className="form-input" value={formData.mcp_config.gitea?.url || ''} onChange={e => updateConfigField('mcp_config.gitea.url', e.target.value)} /></div>
+        <div className="form-group"><label className="form-label">Access token *</label><input type="password" className="form-input" value={formData.mcp_config.gitea?.token || ''} onChange={e => updateConfigField('mcp_config.gitea.token', e.target.value)} /></div>
+        <div className="form-group"><label className="form-label">Repository *</label><input type="text" className="form-input" value={formData.mcp_config.gitea?.repo || ''} onChange={e => updateConfigField('mcp_config.gitea.repo', e.target.value)} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
+          <div className="form-group"><label className="form-label">Base branch</label><input type="text" className="form-input" value={formData.config.base_branch || 'main'} onChange={e => updateConfigField('config.base_branch', e.target.value)} /></div>
+          <div className="form-group"><label className="form-label">Target branch (AI)</label><input type="text" className="form-input" value={formData.config.target_branch || 'ai-feature'} onChange={e => updateConfigField('config.target_branch', e.target.value)} /></div>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--spacing-4)', flexWrap: 'wrap' }}>
+          {[{ key: 'auto_lint', label: 'Auto lint' }, { key: 'auto_commit', label: 'Auto commit' }, { key: 'auto_create_pr', label: 'Auto create PR' }, { key: 'auto_test', label: 'Auto test' }].map(({ key, label }) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>
+              <input type="checkbox" checked={!!formData.config[key]} onChange={e => updateConfigField(`config.${key}`, e.target.checked)} />{label}
+            </label>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {agentType === 'datagouv_explorer' && (
+      <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+        <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>DataGouv configuration</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)' }}>
+          <div className="form-group"><label className="form-label">Page size</label><input type="number" className="form-input" value={formData.config.page_size || 10} onChange={e => updateConfigField('config.page_size', parseInt(e.target.value))} /></div>
+          <div className="form-group"><label className="form-label">Analyze (LLM summary)</label><select className="form-input" value={formData.config.analyze ? 'true' : 'false'} onChange={e => updateConfigField('config.analyze', e.target.value === 'true')}><option value="false">false</option><option value="true">true</option></select></div>
+        </div>
+      </div>
+    )}
+
+    {agentType === 'email_expert' && (
+      <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+        <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>Email configuration</h3>
+        <div className="form-group"><label className="form-label">Email address *</label><input type="email" className="form-input" value={formData.config.email_config?.email || ''} onChange={e => updateConfigField('config.email_config.email', e.target.value)} /></div>
+        <div className="form-group"><label className="form-label">App password *</label><input type="password" className="form-input" value={formData.config.email_config?.password || ''} onChange={e => updateConfigField('config.email_config.password', e.target.value)} /></div>
+      </div>
+    )}
+
+    {agentType === 'wikijs' && (
+      <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+        <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>WikiJS configuration</h3>
+        <div className="form-group"><label className="form-label">Wiki.js URL *</label><input type="text" className="form-input" value={formData.mcp_config.wikijs?.base_url || ''} onChange={e => updateConfigField('mcp_config.wikijs.base_url', e.target.value)} /></div>
+        <div className="form-group"><label className="form-label">API token *</label><input type="password" className="form-input" value={formData.mcp_config.wikijs?.token || ''} onChange={e => updateConfigField('mcp_config.wikijs.token', e.target.value)} /></div>
+      </div>
+    )}
+  </>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REGISTER SKILL MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 const RegisterSkillModal = ({ onClose, onSuccess, providers }) => {
@@ -497,6 +710,107 @@ const RegisterSkillModal = ({ onClose, onSuccess, providers }) => {
   );
 };
 
+const AgentConfigModal = ({ agent, providers, skills, onClose, onSaved }) => {
+  const t = AGENT_TYPES[agent.agent_type];
+  const [formData, setFormData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get(`/api/agents/${agent.id}`);
+        const d = res.data;
+        setFormData({
+          name: d.name,
+          description: d.description || '',
+          // merge avec les defaults du type pour combler les clés manquantes
+          // (utile pour les agents créés avant l'ajout d'un champ)
+          config: { ...t.defaultConfig(providers), ...(d.config || {}) },
+          mcp_config: { ...t.mcpConfig, ...(d.mcp_config || {}) },
+        });
+      } catch (e) {
+        setError(e.response?.data?.detail || 'Failed to load agent config');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [agent.id]);
+
+  const updateConfigField = (path, value) => {
+    const keys = path.split('.');
+    setFormData(prev => {
+      const next = { ...prev, config: { ...prev.config }, mcp_config: { ...prev.mcp_config } };
+      let cur = keys[0] === 'mcp_config' ? next.mcp_config : next.config;
+      for (let i = 1; i < keys.length - 1; i++) {
+        cur[keys[i]] = { ...(cur[keys[i]] || {}) };
+        cur = cur[keys[i]];
+      }
+      cur[keys[keys.length - 1]] = value;
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) { setError('Agent name is required'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.put(`/api/agents/${agent.id}`, {
+        name: formData.name,
+        description: formData.description,
+        config: formData.config,
+        mcp_config: formData.mcp_config,
+      });
+      setSuccess('Configuration updated');
+      setTimeout(() => { onSaved?.(); onClose(); }, 900);
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to update agent');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
+      <div className="card" style={{ width: '100%', maxWidth: '720px', maxHeight: '90vh', overflow: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-4)' }}>
+          <div>
+            <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '600' }}>{t?.icon} Configure — {agent.name}</h2>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-600)' }}>{t?.name} · type non modifiable</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-600)', fontSize: '1.25rem' }}>✕</button>
+        </div>
+
+        {loading && <Loading />}
+        {!loading && error && <Alert type="error" style={{ marginBottom: 'var(--spacing-4)' }} onClose={() => setError(null)}>{error}</Alert>}
+        {success && <Alert type="success" style={{ marginBottom: 'var(--spacing-4)' }}>{success}</Alert>}
+
+        {!loading && formData && (
+          <>
+            <div className="form-group">
+              <label className="form-label">Agent name *</label>
+              <input type="text" className="form-input" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Description</label>
+              <textarea className="form-input" rows={2} value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} />
+            </div>
+
+            <AgentConfigFields agentType={agent.agent_type} formData={formData} providers={providers} skills={skills} updateConfigField={updateConfigField} />
+
+            <div style={{ display: 'flex', gap: 'var(--spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--spacing-6)', paddingTop: 'var(--spacing-4)', borderTop: '1px solid var(--gray-200)' }}>
+              <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+              <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EMBEDDED CHAT — panneau droit post-exécution
@@ -793,6 +1107,19 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
         supported_os: d.supported_os ? d.supported_os.split(',').map(s => s.trim()).filter(Boolean) : ['Debian', 'RedHat'],
         test_mode: d.test_mode ?? false,
       };
+    }
+    if (agent.agent_type === 'wikijs') {
+      const r = { mode: d.mode || 'read' };
+      if (d.query) r.query = d.query;
+      if (d.path) r.path = d.path;
+      if (d.locale) r.locale = d.locale;
+      if (d.question) r.question = d.question;
+      if (d.title) r.title = d.title;
+      if (d.prompt) r.prompt = d.prompt;
+      if (d.context) r.context = d.context;
+      if (d.instruction) r.instruction = d.instruction;
+      if (d.tags) r.tags = d.tags.split(',').map(t => t.trim()).filter(Boolean);
+      return r;
     }
     return {};
   };
@@ -1337,9 +1664,17 @@ const DocumentationTab = () => (
     {DOC_ENTRIES.map(entry => (
       <div key={entry.key} style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
         <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderBottom: '1px solid var(--gray-300)' }}>
-          <h3 style={{ fontWeight: '600', fontSize: 'var(--text-base)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}><span>{entry.icon}</span> {entry.title}</h3>
+          <h3 style={{ fontWeight: '600', fontSize: 'var(--text-base)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+            <span>{entry.icon}</span> {entry.title}
+            {entry.static && (
+              <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '99px', background: 'rgba(251,191,36,.15)', color: 'var(--warning-dark)' }}>
+                static — no DB source
+              </span>
+            )}
+          </h3>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-700)', marginTop: 'var(--spacing-1)', lineHeight: '1.6' }}>{entry.desc}</p>
         </div>
+
         {entry.steps && (
           <div style={{ padding: 'var(--spacing-4)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
             {entry.steps.map(step => (
@@ -1350,12 +1685,38 @@ const DocumentationTab = () => (
             ))}
           </div>
         )}
+
+        {entry.examples && (
+          <div style={{ padding: 'var(--spacing-4)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+            {entry.examples.map(ex => (
+              <div key={ex.key}>
+                <div style={{ fontSize: 'var(--text-xs)', fontWeight: '600', color: 'var(--gray-600)', marginBottom: 'var(--spacing-2)', fontFamily: 'monospace' }}>
+                  {ex.filename}
+                </div>
+                <pre style={{ margin: 0, padding: 'var(--spacing-3)', background: '#0f172a', color: '#e2e8f0', borderRadius: 'var(--radius)', fontSize: '11px', lineHeight: '1.6', overflowX: 'auto', whiteSpace: 'pre' }}>
+                  <code>{ex.content}</code>
+                </pre>
+              </div>
+            ))}
+            {entry.curl && (
+              <div>
+                <div style={{ fontSize: 'var(--text-xs)', fontWeight: '600', color: 'var(--gray-600)', marginBottom: 'var(--spacing-2)' }}>
+                  Register via API
+                </div>
+                <pre style={{ margin: 0, padding: 'var(--spacing-3)', background: '#0f172a', color: '#86efac', borderRadius: 'var(--radius)', fontSize: '11px', lineHeight: '1.6', overflowX: 'auto', whiteSpace: 'pre' }}>
+                  <code>{entry.curl}</code>
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+
         {entry.table && (
           <div style={{ padding: 'var(--spacing-4)', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--gray-300)' }}>
-                  {['agent_type', 'name', 'badge', 'MCP servers'].map(h => (
+                  {entry.columns.map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: 'var(--spacing-2) var(--spacing-3)', color: 'var(--gray-600)', fontWeight: '600', fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{h}</th>
                   ))}
                 </tr>
@@ -1363,12 +1724,25 @@ const DocumentationTab = () => (
               <tbody>
                 {entry.table.map((row, i) => (
                   <tr key={row.key} style={{ borderBottom: i < entry.table.length - 1 ? '1px solid var(--gray-200)' : 'none' }}>
-                    <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', fontFamily: 'monospace', fontSize: 'var(--text-xs)', color: 'var(--gray-800)' }}>{row.key}</td>
-                    <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', fontWeight: '500' }}>{row.name}</td>
-                    <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
-                      <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '99px', background: row.badge === 'skill' ? 'rgba(34,197,94,.15)' : 'rgba(96,165,250,.15)', color: row.badge === 'skill' ? 'var(--success-dark)' : 'var(--primary-dark)' }}>{row.badge}</span>
-                    </td>
-                    <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', color: 'var(--gray-700)', fontSize: 'var(--text-xs)' }}>{row.mcp}</td>
+                    {entry.key === 'reference' ? (
+                      <>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', fontFamily: 'monospace', fontSize: 'var(--text-xs)', color: 'var(--gray-800)' }}>{row.key}</td>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', fontWeight: '500' }}>{row.name}</td>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
+                          <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '99px', background: row.badge === 'skill' ? 'rgba(34,197,94,.15)' : 'rgba(96,165,250,.15)', color: row.badge === 'skill' ? 'var(--success-dark)' : 'var(--primary-dark)' }}>{row.badge}</span>
+                        </td>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', color: 'var(--gray-700)', fontSize: 'var(--text-xs)' }}>{row.mcp}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', fontFamily: 'monospace', fontSize: 'var(--text-xs)', color: 'var(--gray-800)', fontWeight: '600' }}>{row.key}</td>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
+                          <span style={{ fontSize: '10px', fontWeight: '600', padding: '1px 7px', borderRadius: '99px', background: row.transport === 'HTTP' ? 'rgba(96,165,250,.15)' : 'rgba(139,92,246,.15)', color: row.transport === 'HTTP' ? 'var(--primary-dark)' : '#6d28d9' }}>{row.transport}</span>
+                        </td>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', color: 'var(--gray-700)', fontSize: 'var(--text-xs)', fontFamily: 'monospace' }}>{row.credential}</td>
+                        <td style={{ padding: 'var(--spacing-2) var(--spacing-3)', color: 'var(--gray-700)', fontSize: 'var(--text-xs)' }}>{row.tools}</td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -1399,6 +1773,7 @@ const Agents = () => {
   const [preloadExec, setPreloadExec] = useState(null);  // exec à précharger dans le popup
   const [selectedAgentType, setSelectedAgentType] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [configAgent, setConfigAgent] = useState(null);
   const [providers, setProviders] = useState([]);
   const [formData, setFormData] = useState({ name: '', description: '', agent_type: '', config: {}, mcp_config: {} });
 
@@ -1447,9 +1822,11 @@ const Agents = () => {
 
   const validateForm = () => {
     if (!formData.name.trim()) { setError('Agent name is required'); return false; }
-    const t = AGENT_TYPES[selectedAgentType];
-    for (const field of t.requiredFields) {
-      const src = (field.startsWith('github') || field.startsWith('gitea')) ? formData.mcp_config : formData.config;
+    for (const field of AGENT_TYPES[selectedAgentType].requiredFields) {
+      const rootKey = field.split('.')[0];
+      const src = Object.prototype.hasOwnProperty.call(t.mcpConfig || {}, rootKey)
+        ? formData.mcp_config
+        : formData.config;
       const val = field.split('.').reduce((o, k) => o?.[k], src);
       if (!val || val.trim() === '') { setError(`Field ${field} is required`); return false; }
     }
@@ -1619,6 +1996,9 @@ const Agents = () => {
                       <button title="Execution history" onClick={() => setHistoryAgent(agent)} style={{ width: '30px', height: '30px', borderRadius: 'var(--radius)', border: '1px solid var(--gray-300)', background: 'var(--gray-100)', color: 'var(--gray-600)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <History size={14} />
                       </button>
+                      <button title="Configuration" onClick={() => setConfigAgent(agent)} style={{ width: '30px', height: '30px', borderRadius: 'var(--radius)', border: '1px solid var(--gray-300)', background: 'var(--gray-100)', color: 'var(--gray-600)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Settings size={14} />
+                      </button>
                       <button title={agent.is_active ? 'Disable' : 'Enable'} onClick={() => toggleAgent(agent.id)} style={{ width: '30px', height: '30px', borderRadius: 'var(--radius)', border: '1px solid var(--gray-300)', background: 'var(--gray-100)', color: 'var(--gray-600)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>{agent.is_active ? '⏸' : '▷'}</button>
                       <button title="Delete" onClick={() => deleteAgent(agent.id)} style={{ width: '30px', height: '30px', borderRadius: 'var(--radius)', border: '1px solid var(--gray-300)', background: 'var(--gray-100)', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>✕</button>
                     </div>
@@ -1775,6 +2155,36 @@ const Agents = () => {
                     </div>
                   )}
 
+                  {selectedAgentType === 'wikijs' && (
+                    <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+                      <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>WikiJS configuration</h3>
+                      <div className="form-group">
+                        <label className="form-label">Wiki.js URL * <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>base URL, without /graphql</span></label>
+                        <input type="text" className="form-input" value={formData.mcp_config.wikijs?.base_url || ''} onChange={e => updateConfigField('mcp_config.wikijs.base_url', e.target.value)} placeholder="http://wiki.aecoding.local:3000" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">API token * <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>Administration → API Access → New API Key</span></label>
+                        <input type="password" className="form-input" value={formData.mcp_config.wikijs?.token || ''} onChange={e => updateConfigField('mcp_config.wikijs.token', e.target.value)} placeholder="eyJhbGciOiJSUzI1NiIs..." />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)' }}>
+                        <div className="form-group">
+                          <label className="form-label">Default locale</label>
+                          <input type="text" className="form-input" value={formData.config.default_locale || 'en'} onChange={e => updateConfigField('config.default_locale', e.target.value)} placeholder="en" />
+                          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)', marginTop: '4px' }}>Check it.</p>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Default mode</label>
+                          <select className="form-input" value={formData.config.mode || 'read'} onChange={e => updateConfigField('config.mode', e.target.value)}>
+                            <option value="search">search</option>
+                            <option value="read">read</option>
+                            <option value="create">create</option>
+                            <option value="update">update</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: 'var(--spacing-3)', justifyContent: 'space-between', marginTop: 'var(--spacing-6)', paddingTop: 'var(--spacing-4)', borderTop: '1px solid var(--gray-200)' }}>
                     <Button variant="ghost" onClick={() => setSelectedAgentType(null)}>← Back</Button>
                     <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
@@ -1794,6 +2204,16 @@ const Agents = () => {
           </div>
         )}
 
+        {configAgent && (
+          <AgentConfigModal
+            agent={configAgent}
+            providers={providers}
+            skills={skills}
+            onClose={() => setConfigAgent(null)}
+            onSaved={loadAll}
+          />
+        )}
+        
       </div>
     </Layout>
   );

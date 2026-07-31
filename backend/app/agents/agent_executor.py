@@ -24,6 +24,7 @@ from app.mcp.servers.ssh_server import SSHMCPServer
 from app.mcp.servers.winrm_server import WinRMMCPServer
 from app.mcp.servers.gitea_server import GiteaMCPServer
 from app.mcp.servers.datagouv_server import DataGouvMCPServer
+from app.mcp.servers.wikijs_server import WikiJSMCPServer
 
 # ── Agent imports ─────────────────────────────────────────────────────────────
 from app.agents.agent_types.branch_code_review_agent import BranchCodeReviewAgent
@@ -38,6 +39,7 @@ from app.agents.agent_types.gitea_code_generator_agent import GiteaCodeGenerator
 from app.agents.agent_types.datagouv_agent import DataGouvAgent
 from app.agents.agent_types.ansible_role_generator_agent import AnsibleRoleGeneratorAgent
 from app.agents.agent_types.gitea_ansible_role_generator_agent import GiteaAnsibleRoleGeneratorAgent
+from app.agents.agent_types.wikijs_agent import WikiJSAgent
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +57,7 @@ MCP_REGISTRY: Dict[str, Type] = {
     "winrm":       WinRMMCPServer,
     "gitea":       GiteaMCPServer,
     "datagouv":    DataGouvMCPServer,
+    "wikijs":      WikiJSMCPServer,
 }
 
 
@@ -73,6 +76,7 @@ class AgentExecutor:
         "datagouv_explorer":   DataGouvAgent,
         "ansible_role_generator":        AnsibleRoleGeneratorAgent,
         "gitea_ansible_role_generator":  GiteaAnsibleRoleGeneratorAgent,
+        "wikijs":              WikiJSAgent,
     }
 
     def __init__(self, db: Session):
