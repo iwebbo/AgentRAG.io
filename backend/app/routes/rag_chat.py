@@ -169,6 +169,10 @@ MODEL_CONTEXT_LIMITS = {
     # LMStudio - Qwen
     "qwen/qwen3.5-9b": 128000,
 
+    # LMStudio - Qwen
+    "qwen3.5-4b-claude-4.6-opus-reasoning-distilled": 128000,
+
+
     # Fallback
     "default": 8192
 }

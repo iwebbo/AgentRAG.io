@@ -20,7 +20,7 @@ settings = get_settings()
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
-    version="1.0.51",
+    version="1.0.65",
     description="AgentRAG & Agent Multi-provider LLM Chat Application with Advanced Streaming & MCP Agent Skills",
     debug=settings.DEBUG
 )

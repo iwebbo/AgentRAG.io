@@ -176,7 +176,7 @@ const Login = () => {
           }}
         >
           <p style={{ fontSize: '0.813rem', color: 'var(--text-tertiary)' }}>
-            AgentRAG.io version 1.0.56
+            AgentRAG.io version 1.0.65
           </p>
         </div>
       </div>
