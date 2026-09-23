@@ -133,6 +133,7 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 | GitHub | `github` | HTTP | `mcp_config.github` | `get_file_content`, `update_file`, `create_pull_request`, `list_issues`, `create_review` |
 | DataGouv | `datagouv` | HTTP | none (public API) | `search_datasets`, `get_dataset`, `search_organizations`, `list_topics`, `get_topic` |
 | WikiJS | `wikijs` | HTTP | `mcp_config.wikijs` | `search_pages`, `get_page`, `create_page`, `update_page` |
+| SonarQube | `sonarqube` | HTTP | `mcp_config.sonarqube` (API token, Bearer → Basic auto-fallback) | `validate_auth`, `get_system_status`, `list_projects`, `get_project`, `list_branches`, `search_issues`, `fetch_all_issues`, `get_issue`, `get_issues_summary`, `list_security_hotspots`, `get_security_hotspot`, `get_rule`, `get_source_snippet`, `get_quality_gate`, `get_measures` |
 | Linter | `linter` | stdio | none | `lint_file`, `format_file`, `lint_directory`, `check_syntax` |
 | Test Runner | `test_runner` | stdio | none | `run_tests`, `run_single_test`, `get_coverage` |
 
@@ -167,6 +168,8 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 | **SSH Agent** | `skill` (.md) | Remote command execution on Linux/Unix hosts | SSH (DB-aware) | — |
 | **WinRM Agent** | `skill` (.md) | Remote PowerShell execution on Windows hosts | WinRM (DB-aware) | — |
 | **Skill Agent** | `skill` | Any custom agent defined via `.md` frontmatter | Any registered MCP | Any project |
+| **SonarQube Security** | `sonarqube` | Projects inventory, vulnerabilities, security hotspots, quality gate, and LLM-assisted remediation (modes: `projects`, `overview`, `issues`, `hotspots`, `remediate`) | `sonarqube` | Optional — repository project (`use_rag: true` + `project_id`) |
+
 | *(Custom)* | `skill` | Build your own specialized agent | Any MCP server | Any project |
 
 ### Core RAG Features (from RAG.io)
