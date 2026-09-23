@@ -121,19 +121,19 @@ const AGENT_TYPES = {
     ]
   },
   ansible_role_generator: {
-  name: 'Ansible Role Generator',
-  description: 'Scaffold and push a complete Ansible role (Galaxy structure) to a GitHub repo via MCP',
-  icon: '⚙', color: '#3b82f6', badge: 'fixed', mcp: ['github', 'linter'],
-  defaultConfig: (providers) => ({
-    mcp_servers: ['github', 'linter'],
-    llm_provider: providers[0]?.name || 'lmstudio',
-    llm_model: 'openai/gpt-oss-20b',
-    llm_temperature: 0.2,
-    base_branch: 'main',
-    auto_lint: true,
-    auto_commit: true,
-    auto_create_pr: false,
-    roles_path: 'roles',
+    name: 'Ansible Role Generator',
+    description: 'Scaffold and push a complete Ansible role (Galaxy structure) to a GitHub repo via MCP',
+    icon: '⚙', color: '#3b82f6', badge: 'fixed', mcp: ['github', 'linter'],
+    defaultConfig: (providers) => ({
+      mcp_servers: ['github', 'linter'],
+      llm_provider: providers[0]?.name || 'lmstudio',
+      llm_model: 'openai/gpt-oss-20b',
+      llm_temperature: 0.2,
+      base_branch: 'main',
+      auto_lint: true,
+      auto_commit: true,
+      auto_create_pr: false,
+      roles_path: 'roles',
     }),
     mcpConfig: { github: { token: '', repo: '' } },
     requiredFields: ['github.token', 'github.repo'],
@@ -182,7 +182,7 @@ const AGENT_TYPES = {
       { name: 'sort', label: 'Sort (search: -created | -last_update | views…)', type: 'text', placeholder: '-last_update' }
     ]
   },
-wikijs: {
+  wikijs: {
     name: 'WikiJS Assistant',
     description: 'Read, search, create and update Wiki.js documentation pages, powered by a local LLM',
     icon: '⌬', color: '#16a34a', badge: 'fixed', mcp: ['wikijs'],
@@ -214,8 +214,136 @@ wikijs: {
       { name: 'tags', label: 'Tags, comma-separated (mode: create, optional)', type: 'text', placeholder: 'infra, installation' },
       { name: 'locale', label: 'Locale override (optional)', type: 'text', placeholder: 'en' },
     ]
+  },
+  sonarqube: {
+    name: 'SonarQube Security',
+    description: 'SonarQube audit — projects, vulnerabilities, security hotspots, quality gate and LLM-assisted remediation',
+    icon: '◈', color: '#4E9BCD', badge: 'fixed', mcp: ['sonarqube'],
+    defaultConfig: (providers) => ({
+      mcp_servers: ['sonarqube'],
+      mode: 'projects',
+      analyze: false,
+      page_size: 50,
+      max_remediations: 3,
+      snippet_context: 15,
+      use_rag: false,
+      project_id: '',
+      llm_provider: providers[0]?.name || 'lmstudio',
+      llm_model: 'openai/gpt-oss-20b',
+      llm_temperature: 0.2,
+    }),
+    mcpConfig: { sonarqube: { base_url: '', token: '', verify_ssl: false, auth_mode: 'bearer', timeout: 30 } },
+    requiredFields: ['sonarqube.base_url', 'sonarqube.token'],
+    executeFields: [
+      { name: 'mode', label: 'Mode', type: 'select', required: true, options: [
+          { value: 'projects',  label: 'projects — inventory' },
+          { value: 'overview',  label: 'overview — quality gate + metrics + posture' },
+          { value: 'issues',    label: 'issues — vulnerabilities / bugs' },
+          { value: 'hotspots',  label: 'hotspots — security hotspots' },
+          { value: 'remediate', label: 'remediate — LLM fixes' },
+        ], defaultValue: 'projects' },
+      { name: 'query', label: 'Project filter (mode: projects)', type: 'text', placeholder: 'backend' },
+      { name: 'project_key', label: 'Project key', type: 'text', placeholder: 'MON_PROJET' },
+      { name: 'branch', label: 'Branch (optional)', type: 'text', placeholder: 'main' },
+      { name: 'types', label: 'Types, comma-separated', type: 'text', placeholder: 'VULNERABILITY,BUG' },
+      { name: 'severities', label: 'Severities, comma-separated', type: 'text', placeholder: 'BLOCKER,CRITICAL' },
+      { name: 'issue_keys', label: 'Issue keys, comma-separated (overrides project selection)', type: 'text', placeholder: 'AY7xK...,AY8zL...' },
+      { name: 'max_remediations', label: 'Max remediations', type: 'number', placeholder: '3' },
+      { name: 'snippet_context', label: 'Snippet context (lines around issue)', type: 'number', placeholder: '15' },
+      { name: 'page_size', label: 'Page size', type: 'number', placeholder: '50' },
+      { name: 'with_quality_gate', label: 'Include quality gate per project', type: 'checkbox', defaultValue: false },
+      { name: 'in_new_code_period', label: 'New code only', type: 'checkbox', defaultValue: false },
+    ]
   }
 };
+
+// Champs d'exécution visibles par mode (agent sonarqube)
+const SONAR_FIELDS_BY_MODE = {
+  projects:  ['query', 'with_quality_gate', 'page_size'],
+  overview:  ['project_key', 'branch', 'in_new_code_period'],
+  issues:    ['project_key', 'branch', 'types', 'severities', 'in_new_code_period', 'page_size'],
+  hotspots:  ['project_key', 'branch', 'in_new_code_period', 'page_size'],
+  remediate: ['project_key', 'issue_keys', 'branch', 'types', 'severities', 'max_remediations', 'snippet_context'],
+};
+
+// Rendu texte des résultats sonarqube — le panneau Output est monospace / pre-wrap
+const formatSonarResult = (r) => {
+  if (!r || typeof r !== 'object') return '';
+  const payload = r.mode ? r : (r.data && r.data.mode ? r.data : r);
+  if (!payload.mode) return '';
+  const kv = (o) => Object.entries(o || {}).map(([k, v]) => `${k}=${v}`).join('  ') || '—';
+  const file = (c) => (c || '').split(':').pop();
+  const L = [];
+  switch (payload.mode) {
+    case 'projects':
+      L.push(`Projects: ${payload.total ?? 0}  (source: ${payload.source || '?'})`, '');
+      (payload.projects || []).forEach(p => L.push(
+        `• ${p.key}  —  ${p.name}` +
+        (p.quality_gate ? `  [QG ${p.quality_gate}]` : '') +
+        (p.last_analysis_date ? `  · ${p.last_analysis_date}` : '')
+      ));
+      break;
+    case 'overview':
+      L.push(`Project: ${payload.project_key}${payload.branch ? ` (${payload.branch})` : ''}`,
+             `Quality gate: ${payload.quality_gate?.status || 'N/A'}`);
+      (payload.quality_gate?.failed_conditions || []).forEach(c =>
+        L.push(`  ✗ ${c.metric}: ${c.actual} (${c.comparator} ${c.threshold})`));
+      L.push('', 'Measures:');
+      Object.entries(payload.measures || {}).forEach(([k, v]) => L.push(`  ${k.padEnd(26)} ${v}`));
+      L.push('', `Issues: ${payload.issues_summary?.total ?? 0}`,
+        `  Severity: ${kv(payload.issues_summary?.by_severity)}`,
+        `  Type:     ${kv(payload.issues_summary?.by_type)}`,
+        `Hotspots to review: ${payload.hotspots?.total ?? 0}`);
+      if (payload.analysis) L.push('', '── LLM analysis ──', payload.analysis);
+      break;
+    case 'issues':
+      L.push(`Project: ${payload.project_key} — ${payload.total ?? 0} issues`,
+             `Severity: ${kv(payload.by_severity)}`,
+             `Type:     ${kv(payload.by_type)}`, '');
+      (payload.issues || []).forEach(i => L.push(
+        `[${i.severity}][${i.type}] ${i.rule}  ${file(i.component)}:${i.line ?? '-'}`,
+        `    ${i.message}  (${i.key})`
+      ));
+      if (payload.summary) L.push('', '── LLM analysis ──', payload.summary);
+      break;
+    case 'hotspots':
+      L.push(`Project: ${payload.project_key} — ${payload.total ?? 0} hotspots (${payload.status})`, '');
+      (payload.hotspots || []).forEach(h => L.push(
+        `[${h.vulnerability_probability}] ${h.security_category}  ${file(h.component)}:${h.line ?? '-'}`,
+        `    ${h.message}  (${h.key})`
+      ));
+      if (payload.summary) L.push('', '── LLM analysis ──', payload.summary);
+      break;
+    case 'remediate':
+      L.push(`Remediations: ${payload.count ?? 0}${payload.project_key ? `  —  ${payload.project_key}` : ''}`, '');
+      (payload.remediations || []).forEach((x, n) => L.push(
+        `━━ [${n + 1}/${payload.count}] ${x.severity} ${x.rule} — ${x.rule_name || ''}`,
+        `${x.component}:${x.line}  (${x.issue_key})`,
+        x.message || '',
+        '',
+        x.remediation || '(no remediation generated)',
+        ''
+      ));
+      break;
+    default:
+      return JSON.stringify(payload, null, 2);
+  }
+  return L.join('\n');
+};
+
+// Clone profond du template mcpConfig du type, puis merge des valeurs persistées.
+// Indispensable : un spread superficiel partageait les sous-objets avec AGENT_TYPES,
+// et la saisie d'un token mutait la constante globale (fuite entre agents).
+const mergeMcpConfig = (template, saved) => {
+  const base = JSON.parse(JSON.stringify(template || {}));
+  Object.entries(saved || {}).forEach(([server, cfg]) => {
+    base[server] = (cfg && typeof cfg === 'object' && !Array.isArray(cfg))
+      ? { ...(base[server] || {}), ...cfg }
+      : cfg;
+  });
+  return base;
+};
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DOC ENTRIES
@@ -306,6 +434,7 @@ const MCP_SERVERS_STATIC = [
   { key: 'github',      transport: 'HTTP',  credential: 'mcp_config.github',    tools: 'get_file_content, update_file, create_pull_request, list_issues, create_review' },
   { key: 'datagouv',    transport: 'HTTP',  credential: 'none (public API)',    tools: 'search_datasets, get_dataset, search_organizations, list_topics, get_topic' },
   { key: 'wikijs',      transport: 'HTTP',  credential: 'mcp_config.wikijs',    tools: 'search_pages, get_page, create_page, update_page' },
+  { key: 'sonarqube',   transport: 'HTTP',  credential: 'mcp_config.sonarqube', tools: 'validate_auth, get_system_status, list_projects, get_project, list_branches, search_issues, fetch_all_issues, get_issue, get_issues_summary, list_security_hotspots, get_security_hotspot, get_rule, get_source_snippet, get_quality_gate, get_measures' },
   { key: 'linter',      transport: 'stdio', credential: 'none',                 tools: 'lint_file, format_file, lint_directory, check_syntax' },
   { key: 'test_runner', transport: 'stdio', credential: 'none',                 tools: 'run_tests, run_single_test, get_coverage' },
 ];
@@ -326,6 +455,16 @@ const DOC_ENTRIES = [
     desc: 'Copy one of these, adjust the ## Mapping to your infra, then register it via POST /api/skills/register (multipart form, see curl below).',
     curl: SKILL_REGISTER_CURL,
     examples: SKILL_MD_EXAMPLES
+  },
+  {
+    key: 'sonarqube', icon: '◈', title: 'SonarQube Security (fixed agent)',
+    desc: 'Fixed agent backed by MCP SonarQube (API token). Bearer → Basic auth fallback is automatic, as is projects/search → components/search_projects on 403. The token needs Browse on target projects, plus See Source Code for mode=remediate.',
+    steps: [
+      { n: 1, text: 'Create the agent with mcp_config.sonarqube = { base_url, token }. Token: My Account → Security → Generate Token (User token). base_url must not include /api.' },
+      { n: 2, text: 'mode=projects → inventory, optional query filter and quality gate per project. mode=overview + project_key → quality gate, metrics, issue facets, hotspots, LLM posture analysis.' },
+      { n: 3, text: 'mode=issues + project_key → filtered issues (types, severities, branch, new code). mode=hotspots → security hotspots with risk description and fix recommendations.' },
+      { n: 4, text: 'mode=remediate + project_key (top N vulnerabilities) or issue_keys → SonarQube rule + real source snippet (+ optional repository RAG) → LLM fix per issue. Enable Repository RAG + RAG project ID in the agent configuration to align fixes with your codebase conventions.' }
+    ]
   },
   {
     key: 'reference', icon: '⌬', title: 'Agent types reference',
@@ -392,7 +531,7 @@ const ExecutionHistoryPanel = ({ agent, agentType, onClose, onReopenExec }) => {
 
   const getPromptLabel = (exec) => {
     const d = exec.input_data || {};
-    return d.prompt || d.query || d.branch || d.mode || `#${exec.id?.slice(0, 8)}`;
+    return d.prompt || d.query || d.branch || d.project_key || d.mode || `#${exec.id?.slice(0, 8)}`;
   };
 
   return (
@@ -510,6 +649,101 @@ const SkillExecuteFields = ({ executeData, onChange, hosts }) => (
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SONARQUBE CONFIG FIELDS — partagé entre Create et Edit
+// ─────────────────────────────────────────────────────────────────────────────
+const SonarQubeConfigFields = ({ formData, updateConfigField }) => {
+  const sq = formData.mcp_config.sonarqube || {};
+  const cfg = formData.config || {};
+  const num = (v, d) => (v === '' || isNaN(parseInt(v, 10)) ? d : parseInt(v, 10));
+  const hint = { fontSize: 'var(--text-xs)', color: 'var(--gray-500)' };
+  return (
+    <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+      <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>SonarQube configuration</h3>
+
+      <div className="form-group">
+        <label className="form-label">SonarQube URL * <span style={hint}>base URL, without /api</span></label>
+        <input type="text" className="form-input" value={sq.base_url || ''} onChange={e => updateConfigField('mcp_config.sonarqube.base_url', e.target.value)} placeholder="https://sonarqube.aecoding.local" />
+      </div>
+      <div className="form-group">
+        <label className="form-label">API token * <span style={hint}>My Account → Security → Generate Token</span></label>
+        <input type="password" className="form-input" value={sq.token || ''} onChange={e => updateConfigField('mcp_config.sonarqube.token', e.target.value)} placeholder="squ_..." />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Auth mode <span style={hint}>auto-fallback on 401</span></label>
+          <select className="form-input" value={sq.auth_mode || 'bearer'} onChange={e => updateConfigField('mcp_config.sonarqube.auth_mode', e.target.value)}>
+            <option value="bearer">bearer (10.x+ / SonarCloud)</option>
+            <option value="basic">basic (8.x / 9.x)</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Verify SSL</label>
+          <select className="form-input" value={sq.verify_ssl ? 'true' : 'false'} onChange={e => updateConfigField('mcp_config.sonarqube.verify_ssl', e.target.value === 'true')}>
+            <option value="false">false (internal PKI)</option>
+            <option value="true">true</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Timeout (s)</label>
+          <input type="number" className="form-input" value={sq.timeout ?? 30} onChange={e => updateConfigField('mcp_config.sonarqube.timeout', num(e.target.value, 30))} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Default mode</label>
+          <select className="form-input" value={cfg.mode || 'projects'} onChange={e => updateConfigField('config.mode', e.target.value)}>
+            {Object.keys(SONAR_FIELDS_BY_MODE).map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Page size</label>
+          <input type="number" className="form-input" value={cfg.page_size ?? 50} onChange={e => updateConfigField('config.page_size', num(e.target.value, 50))} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Analyze (LLM summary)</label>
+          <select className="form-input" value={cfg.analyze ? 'true' : 'false'} onChange={e => updateConfigField('config.analyze', e.target.value === 'true')}>
+            <option value="false">false — raw results</option>
+            <option value="true">true — LLM analysis</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Max remediations / run</label>
+          <input type="number" className="form-input" value={cfg.max_remediations ?? 3} onChange={e => updateConfigField('config.max_remediations', num(e.target.value, 3))} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Snippet context (lines)</label>
+          <input type="number" className="form-input" value={cfg.snippet_context ?? 15} onChange={e => updateConfigField('config.snippet_context', num(e.target.value, 15))} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Repository RAG</label>
+          <select className="form-input" value={cfg.use_rag ? 'true' : 'false'} onChange={e => updateConfigField('config.use_rag', e.target.value === 'true')}>
+            <option value="false">disabled</option>
+            <option value="true">enabled</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">RAG project ID <span style={hint}>indexed repository — Projects page</span></label>
+          <input type="text" className="form-input" value={cfg.project_id || ''} disabled={!cfg.use_rag} onChange={e => updateConfigField('config.project_id', e.target.value)} placeholder="uuid" />
+        </div>
+      </div>
+
+      <div style={{ border: '1px solid var(--info)', borderLeft: '3px solid var(--info)', borderRadius: 'var(--radius)', padding: 'var(--spacing-2) var(--spacing-3)', backgroundColor: 'rgba(96,165,250,0.06)', fontSize: 'var(--text-xs)', color: 'var(--gray-700)', lineHeight: '1.6' }}>
+        <strong style={{ color: 'var(--info)' }}>Token permissions.</strong> Browse on target projects is enough for projects / overview / issues / hotspots.
+        Mode <code style={{ background: 'var(--gray-200)', padding: '0 3px', borderRadius: '3px' }}>remediate</code> also needs See Source Code, otherwise the LLM gets no code snippet.
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // AGENT CONFIG FIELDS — partagé entre Create et Edit
 // ─────────────────────────────────────────────────────────────────────────────
 const AgentConfigFields = ({ agentType, formData, providers, skills, updateConfigField }) => (
@@ -602,6 +836,10 @@ const AgentConfigFields = ({ agentType, formData, providers, skills, updateConfi
         <div className="form-group"><label className="form-label">Wiki.js URL *</label><input type="text" className="form-input" value={formData.mcp_config.wikijs?.base_url || ''} onChange={e => updateConfigField('mcp_config.wikijs.base_url', e.target.value)} /></div>
         <div className="form-group"><label className="form-label">API token *</label><input type="password" className="form-input" value={formData.mcp_config.wikijs?.token || ''} onChange={e => updateConfigField('mcp_config.wikijs.token', e.target.value)} /></div>
       </div>
+    )}
+
+    {agentType === 'sonarqube' && (
+      <SonarQubeConfigFields formData={formData} updateConfigField={updateConfigField} />
     )}
   </>
 );
@@ -729,7 +967,7 @@ const AgentConfigModal = ({ agent, providers, skills, onClose, onSaved }) => {
           // merge avec les defaults du type pour combler les clés manquantes
           // (utile pour les agents créés avant l'ajout d'un champ)
           config: { ...t.defaultConfig(providers), ...(d.config || {}) },
-          mcp_config: { ...t.mcpConfig, ...(d.mcp_config || {}) },
+          mcp_config: mergeMcpConfig(t.mcpConfig, d.mcp_config),
         });
       } catch (e) {
         setError(e.response?.data?.detail || 'Failed to load agent config');
@@ -999,6 +1237,14 @@ const EmbeddedChat = ({ conversationId, agentName }) => {
   );
 };
 
+// Extraction générique du texte d'un payload agent (inchangé, remonté au scope module)
+const extractContent = (data) => {
+  if (!data) return '';
+  if (typeof data === 'string') return data;
+  return data.content || data.result || data.output || data.summary || data.text
+    || (data.data && extractContent(data.data)) || '';
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EXECUTE MODAL — SSE stream + split panel post-exécution
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1017,11 +1263,26 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
   const outputRef = useRef(null);
   const readerRef = useRef(null);
 
+  const isSonar = agent.agent_type === 'sonarqube';
+
+  // Rendu d'un output_data / payload result selon le type d'agent
+  const renderOutput = (raw) => {
+    if (!raw) return '';
+    if (isSonar) {
+      const formatted = formatSonarResult(raw);
+      if (formatted) return formatted;
+    }
+    if (typeof raw === 'string') return raw;
+    return extractContent(raw) || JSON.stringify(raw, null, 2);
+  };
+
   useEffect(() => {
     const defaults = {};
     agentType?.executeFields?.forEach(f => {
       if (f.defaultValue !== undefined) defaults[f.name] = f.defaultValue;
     });
+    // l'agent sonarqube démarre sur le mode par défaut de sa configuration
+    if (isSonar && agent.config?.mode) defaults.mode = agent.config.mode;
     setExecuteData(defaults);
   }, [agentType]);
 
@@ -1037,7 +1298,7 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
     const convId = preloadExec.input_data?.conversation_id || preloadExec.output_data?.conversation_id;
     const out = preloadExec.output_data;
     const text = (out && typeof out === 'object')
-      ? (out.content || out.result || out.output || out.summary || out.text || JSON.stringify(out, null, 2))
+      ? renderOutput(out)
       : (typeof out === 'string' ? out : '');
     setConversationId(convId || null);
     setOutputText(text);
@@ -1121,6 +1382,25 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
       if (d.tags) r.tags = d.tags.split(',').map(t => t.trim()).filter(Boolean);
       return r;
     }
+    if (agent.agent_type === 'sonarqube') {
+      const mode = d.mode || 'projects';
+      const allowed = SONAR_FIELDS_BY_MODE[mode] || [];
+      const csv = (v) => String(v).split(',').map(s => s.trim()).filter(Boolean);
+      const has = (k) => allowed.includes(k) && d[k] !== undefined && d[k] !== '' && d[k] !== false;
+      const r = { mode };
+      if (has('query')) r.query = String(d.query).trim();
+      if (has('project_key')) r.project_key = String(d.project_key).trim();
+      if (has('branch')) r.branch = String(d.branch).trim();
+      if (has('types')) r.types = csv(d.types).map(s => s.toUpperCase());
+      if (has('severities')) r.severities = csv(d.severities).map(s => s.toUpperCase());
+      if (has('issue_keys')) r.issue_keys = csv(d.issue_keys);
+      if (has('with_quality_gate')) r.with_quality_gate = true;
+      if (has('in_new_code_period')) r.in_new_code_period = true;
+      ['page_size', 'max_remediations', 'snippet_context'].forEach(k => {
+        if (has(k) && !isNaN(parseInt(d[k], 10))) r[k] = parseInt(d[k], 10);
+      });
+      return r;
+    }
     return {};
   };
 
@@ -1130,18 +1410,20 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
       if (!executeData.host) { setError('Target host is required'); return false; }
       return true;
     }
+    if (agent.agent_type === 'sonarqube') {
+      const m = executeData.mode || 'projects';
+      const hasKeys = m === 'remediate' && executeData.issue_keys?.trim();
+      if (m !== 'projects' && !executeData.project_key?.trim() && !hasKeys) {
+        setError(m === 'remediate' ? 'Project key or issue keys required' : 'Project key is required');
+        return false;
+      }
+      return true;
+    }
     const required = agentType?.executeFields?.filter(f => f.required) || [];
     for (const f of required) {
       if (!executeData[f.name]) { setError(`"${f.label}" is required`); return false; }
     }
     return true;
-  };
-
-  const extractContent = (data) => {
-    if (!data) return '';
-    if (typeof data === 'string') return data;
-    return data.content || data.result || data.output || data.summary || data.text
-      || (data.data && extractContent(data.data)) || '';
   };
 
   const addStep = (type, message) => setSteps(prev => [...prev, { type, message, ts: new Date().toLocaleTimeString() }]);
@@ -1199,12 +1481,12 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
               const msg = data.data?.message || data.message || data.data?.step || '';
               if (msg) addStep(eventType, msg);
             } else if (eventType === 'result') {
-              const c = extractContent(data);
+              const c = renderOutput(data);
               if (c) setOutputText(prev => prev + (prev ? '\n\n' : '') + c);
               addStep('result', '✅ Result received');
             } else if (eventType === 'done') {
               setConversationId(prev => prev || data.conversation_id);
-              const c = extractContent(data.output);
+              const c = renderOutput(data.output);
               if (c) setOutputText(prev => prev || c);
               setPhase('done');
               if (onExecuted) onExecuted();
@@ -1285,6 +1567,10 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
                   if (emailMode === 'send_email' && !['to', 'subject', 'body'].includes(field.name)) return null;
                   if (emailMode === 'send_email_llm' && !['to', 'subject', 'instructions', 'context', 'auto_send'].includes(field.name)) return null;
                   if (emailMode === 'analyze_inbox' && !['limit', 'unread_only'].includes(field.name)) return null;
+                }
+                if (isSonar && field.name !== 'mode') {
+                  const allowed = SONAR_FIELDS_BY_MODE[executeData.mode || 'projects'] || [];
+                  if (!allowed.includes(field.name)) return null;
                 }
                 return (
                   <div key={field.name} className="form-group">
@@ -1389,7 +1675,7 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
                   const convId = exec.input_data?.conversation_id
                     || (typeof eOut === 'object' && eOut !== null && (eOut.conversation_id || eOut.data?.conversation_id))
                     || null;
-                  const label = (exec.input_data?.prompt || exec.input_data?.query || exec.input_data?.branch || exec.input_data?.mode || `#${exec.id?.slice(0, 8)}`);
+                  const label = (exec.input_data?.prompt || exec.input_data?.query || exec.input_data?.branch || exec.input_data?.project_key || exec.input_data?.mode || `#${exec.id?.slice(0, 8)}`);
                   const dur = exec.execution_time_ms ? (exec.execution_time_ms < 60000 ? `${Math.round(exec.execution_time_ms / 1000)}s` : `${Math.floor(exec.execution_time_ms / 60000)}m ${Math.round((exec.execution_time_ms % 60000) / 1000)}s`) : '';
                   const dt = exec.started_at ? new Date(exec.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
                   return (
@@ -1406,7 +1692,7 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
                         onClick={() => {
                           if (!convId) return;
                           const text = (eOut && typeof eOut === 'object')
-                            ? (eOut.content || eOut.result || eOut.output || eOut.summary || eOut.text || JSON.stringify(eOut, null, 2))
+                            ? renderOutput(eOut)
                             : (typeof eOut === 'string' ? eOut : '');
                           setConversationId(convId);
                           setOutputText(text);
@@ -1488,7 +1774,6 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
     </div>
   );
 };
-
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1817,18 +2102,21 @@ const Agents = () => {
   const selectAgentType = (type) => {
     setSelectedAgentType(type);
     const t = AGENT_TYPES[type];
-    setFormData({ name: '', description: t.description, agent_type: type, config: t.defaultConfig(providers), mcp_config: { ...t.mcpConfig } });
+    setFormData({ name: '', description: t.description, agent_type: type, config: t.defaultConfig(providers), mcp_config: mergeMcpConfig(t.mcpConfig, {}) });
   };
 
   const validateForm = () => {
     if (!formData.name.trim()) { setError('Agent name is required'); return false; }
-    for (const field of AGENT_TYPES[selectedAgentType].requiredFields) {
+    //for (const field of AGENT_TYPES[selectedAgentType].requiredFields) {
+    const agentTypeDef = AGENT_TYPES[selectedAgentType];
+    for (const field of agentTypeDef.requiredFields) {
       const rootKey = field.split('.')[0];
-      const src = Object.prototype.hasOwnProperty.call(t.mcpConfig || {}, rootKey)
+      //const src = Object.prototype.hasOwnProperty.call(t.mcpConfig || {}, rootKey)
+      const src = Object.prototype.hasOwnProperty.call(agentTypeDef.mcpConfig || {}, rootKey)
         ? formData.mcp_config
         : formData.config;
       const val = field.split('.').reduce((o, k) => o?.[k], src);
-      if (!val || val.trim() === '') { setError(`Field ${field} is required`); return false; }
+      if (!val || String(val).trim() === '') { setError(`Field ${field} is required`); return false; }
     }
     return true;
   };
@@ -1874,14 +2162,16 @@ const Agents = () => {
 
   const updateConfigField = (path, value) => {
     const keys = path.split('.');
-    const newFormData = { ...formData };
-    let current = keys[0] === 'mcp_config' ? newFormData.mcp_config : newFormData.config;
-    for (let i = (keys[0] === 'mcp_config' || keys[0] === 'config') ? 1 : 0; i < keys.length - 1; i++) {
-      if (!current[keys[i]]) current[keys[i]] = {};
-      current = current[keys[i]];
-    }
-    current[keys[keys.length - 1]] = value;
-    setFormData(newFormData);
+    setFormData(prev => {
+      const next = { ...prev, config: { ...prev.config }, mcp_config: { ...prev.mcp_config } };
+      let cur = keys[0] === 'mcp_config' ? next.mcp_config : next.config;
+      for (let i = 1; i < keys.length - 1; i++) {
+        cur[keys[i]] = { ...(cur[keys[i]] || {}) };
+        cur = cur[keys[i]];
+      }
+      cur[keys[keys.length - 1]] = value;
+      return next;
+    });
   };
 
   const totalActive = agents.filter(a => a.is_active).length;
@@ -2185,6 +2475,10 @@ const Agents = () => {
                     </div>
                   )}
 
+                  {selectedAgentType === 'sonarqube' && (
+                    <SonarQubeConfigFields formData={formData} updateConfigField={updateConfigField} />
+                  )}
+
                   <div style={{ display: 'flex', gap: 'var(--spacing-3)', justifyContent: 'space-between', marginTop: 'var(--spacing-6)', paddingTop: 'var(--spacing-4)', borderTop: '1px solid var(--gray-200)' }}>
                     <Button variant="ghost" onClick={() => setSelectedAgentType(null)}>← Back</Button>
                     <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
@@ -2213,7 +2507,7 @@ const Agents = () => {
             onSaved={loadAll}
           />
         )}
-        
+
       </div>
     </Layout>
   );

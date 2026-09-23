@@ -34,7 +34,7 @@ markdown==3.5.1
 beautifulsoup4==4.12.2
 openpyxl==3.1.2
 numpy<2.0.0
-torch>=2.0.0
+#torch>=2.0.0
 transformers>=4.35.0
 
 # Integrations
@@ -80,4 +80,4 @@ weasyprint>=62.0
 # Juridique
 spacy==3.7.2
 #fr-dep-news-trf @ https://github.com/explosion/spacy-models/releases/download/fr_dep_news_trf-3.7.0/fr_dep_news_trf-3.7.0-py3-none-any.whl
-fr-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_lg-3.7.0/fr_core_news_lg-3.7.0-py3-none-any.whl
+#fr-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_lg-3.7.0/fr_core_news_lg-3.7.0-py3-none-any.whl

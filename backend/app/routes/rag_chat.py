@@ -44,31 +44,31 @@ class QueryType(Enum):
 RAG_STRATEGIES = {
     QueryType.ARCHITECTURE: {
         "description": "Vue globale projet",
-        "top_k": 5,
+        "top_k": 50,
         "context_ratio": 0.5,  # 60% du contexte disponible
         "include_index": True
     },
     QueryType.CODE_GEN: {
         "description": "Génération de code",
-        "top_k": 6,
+        "top_k": 60,
         "context_ratio": 0.5,
         "include_index": True
     },
     QueryType.DEBUG: {
         "description": "Debug/Fix",
-        "top_k": 5,
+        "top_k": 50,
         "context_ratio": 0.5,
         "include_index": False
     },
     QueryType.FEATURE: {
         "description": "Nouvelle fonctionnalité",
-        "top_k": 8,
+        "top_k": 50,
         "context_ratio": 0.5,
         "include_index": True
     },
     QueryType.SIMPLE: {
         "description": "Question simple",
-        "top_k": 5,
+        "top_k": 50,
         "context_ratio": 0.5,
         "include_index": False
     }

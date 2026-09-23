@@ -1,10 +1,36 @@
 import { useState, useEffect } from 'react';
-import { User, Save, Search, CheckCircle, XCircle, Plus, RefreshCw, Loader2, Database } from 'lucide-react';
+import {
+  User, Save, Search, CheckCircle, XCircle, Plus, RefreshCw, Loader2, Database,
+  KeyRound, Copy, Eye, EyeOff, Clock, ShieldAlert, Terminal
+} from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 import { useAuthStore } from '../store/authStore';
+import { authService } from '../services/auth';
 import api from '../services/api';
+
+/**
+ * Décode le payload d'un JWT (base64url) sans dépendance externe.
+ * Ne vérifie PAS la signature : usage purement informatif côté UI
+ * (affichage de la date d'expiration réelle configurée côté backend
+ * via ACCESS_TOKEN_EXPIRE_MINUTES / REFRESH_TOKEN_EXPIRE_DAYS).
+ */
+const decodeJwtPayload = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join('')
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+};
 
 const Settings = () => {
   const { user, loadUser } = useAuthStore();
@@ -25,6 +51,14 @@ const Settings = () => {
   const [osLoading, setOsLoading] = useState(false);
   const [osIndexInput, setOsIndexInput] = useState('');
   const [creatingIndex, setCreatingIndex] = useState(false);
+
+  // API Token state (usage externe : intégrations tierces via l'API)
+  const [tokenPassword, setTokenPassword] = useState('');
+  const [tokenLoading, setTokenLoading] = useState(false);
+  const [apiToken, setApiToken] = useState(null); // { access_token, refresh_token, accessExp, refreshExp }
+  const [showAccessToken, setShowAccessToken] = useState(false);
+  const [showRefreshToken, setShowRefreshToken] = useState(false);
+  const [copiedField, setCopiedField] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -92,6 +126,69 @@ const Settings = () => {
     }
   };
 
+  const generateApiToken = async (e) => {
+    e.preventDefault();
+    if (!tokenPassword) {
+      showAlert('error', 'Enter your password to confirm token generation');
+      return;
+    }
+    setTokenLoading(true);
+    try {
+      // Réutilise le flux d'authentification existant (/api/auth/login).
+      // Pas de credentials stockés côté client : le mot de passe n'est
+      // utilisé qu'en mémoire pour cet appel puis immédiatement effacé.
+      const data = await authService.login(user.username, tokenPassword);
+      const accessPayload = decodeJwtPayload(data.access_token);
+      const refreshPayload = decodeJwtPayload(data.refresh_token);
+      setApiToken({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        accessExp: accessPayload?.exp ? new Date(accessPayload.exp * 1000) : null,
+        refreshExp: refreshPayload?.exp ? new Date(refreshPayload.exp * 1000) : null,
+      });
+      setShowAccessToken(false);
+      setShowRefreshToken(false);
+      showAlert('success', 'Token generated successfully');
+    } catch (error) {
+      showAlert('error', error.response?.data?.detail || 'Failed to generate token — check your password');
+    } finally {
+      setTokenPassword('');
+      setTokenLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (text, field) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      showAlert('error', 'Copy failed — select and copy manually');
+    }
+  };
+
+  const revokeApiToken = () => {
+    setApiToken(null);
+    setShowAccessToken(false);
+    setShowRefreshToken(false);
+  };
+
+  const apiBase = typeof window !== 'undefined' ? window.location.origin : '';
+
+  const curlLoginExample = `export BASE="${apiBase}"
+
+TOKEN=$(curl -sk -X POST "$BASE/api/auth/login" \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "username=${user?.username || 'username'}&password=YOUR_PASSWORD" \\
+  | jq -r '.access_token')
+
+echo "TOKEN=$TOKEN"`;
+
+  const curlUseExample = apiToken
+    ? `curl -sk "${apiBase}/api/auth/me" \\
+  -H "Authorization: Bearer ${apiToken.access_token}"`
+    : '';
+
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
@@ -125,6 +222,7 @@ const Settings = () => {
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'opensearch', label: 'OpenSearch', icon: Search },
+    { id: 'api-token', label: 'API Token', icon: KeyRound },
   ];
 
   return (
@@ -363,6 +461,130 @@ const Settings = () => {
                   </div>
                 )}
               </div>
+            </>
+          )}
+
+          {/* ── API Token Tab ──────────────────────────────────────────────── */}
+          {activeTab === 'api-token' && (
+            <>
+              <div className="card" style={{ marginBottom: 'var(--spacing-6)' }}>
+                <div className="card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)' }}>
+                    <KeyRound size={24} style={{ color: 'var(--primary)' }} />
+                    <div>
+                      <h2 className="card-title">API Token</h2>
+                      <p className="card-description">
+                        Generate a token to call this API from an external app (e.g. agentragio.io integrations).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-2)',
+                  padding: 'var(--spacing-3)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)',
+                  background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)'
+                }}>
+                  <ShieldAlert size={18} style={{ color: '#b45309', flexShrink: 0, marginTop: '2px' }} />
+                  <span style={{ fontSize: 'var(--text-sm)', color: '#92400e' }}>
+                    Treat this token like a password. It grants full API access as <strong>{user?.username}</strong>.
+                    Expiry is set by the backend (<code>ACCESS_TOKEN_EXPIRE_MINUTES</code> / <code>REFRESH_TOKEN_EXPIRE_DAYS</code>) —
+                    the exact dates below are read directly from the generated token once you create one. Never commit it to a repo or CI logs.
+                  </span>
+                </div>
+
+                {/* Password confirmation → generate */}
+                <form onSubmit={generateApiToken} style={{ display: 'flex', gap: 'var(--spacing-2)', marginBottom: 'var(--spacing-2)' }}>
+                  <input
+                    type="password"
+                    className="form-input"
+                    style={{ flex: 1 }}
+                    placeholder="Confirm your password to generate a token"
+                    value={tokenPassword}
+                    onChange={e => setTokenPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                  <Button type="submit" variant="primary" icon={KeyRound} loading={tokenLoading} disabled={!tokenPassword}>
+                    Generate Token
+                  </Button>
+                </form>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-400)' }}>
+                  Re-entering your password confirms the request. It is sent once over HTTPS to <code>/api/auth/login</code> and never stored.
+                </p>
+              </div>
+
+              {apiToken && (
+                <div className="card" style={{ marginBottom: 'var(--spacing-6)' }}>
+                  <div className="card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <h2 className="card-title">Generated Credentials</h2>
+                        <p className="card-description">Copy and store these securely — the access token will not be shown again after you leave this page.</p>
+                      </div>
+                      <Button variant="ghost" onClick={revokeApiToken}>Clear</Button>
+                    </div>
+                  </div>
+
+                  {/* Access token */}
+                  <div style={{ marginBottom: 'var(--spacing-4)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label className="form-label" style={{ margin: 0 }}>Access Token</label>
+                      {apiToken.accessExp && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>
+                          <Clock size={12} /> expires {apiToken.accessExp.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+                      <input
+                        readOnly
+                        type={showAccessToken ? 'text' : 'password'}
+                        className="form-input"
+                        style={{ flex: 1, fontFamily: 'monospace', fontSize: 'var(--text-xs)' }}
+                        value={apiToken.access_token}
+                        onFocus={e => e.target.select()}
+                      />
+                      <Button variant="ghost" onClick={() => setShowAccessToken(s => !s)}>
+                        {showAccessToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </Button>
+                      <Button variant="ghost" onClick={() => copyToClipboard(apiToken.access_token, 'access')}>
+                        {copiedField === 'access' ? <CheckCircle size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Refresh token */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label className="form-label" style={{ margin: 0 }}>Refresh Token</label>
+                      {apiToken.refreshExp && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>
+                          <Clock size={12} /> expires {apiToken.refreshExp.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+                      <input
+                        readOnly
+                        type={showRefreshToken ? 'text' : 'password'}
+                        className="form-input"
+                        style={{ flex: 1, fontFamily: 'monospace', fontSize: 'var(--text-xs)' }}
+                        value={apiToken.refresh_token}
+                        onFocus={e => e.target.select()}
+                      />
+                      <Button variant="ghost" onClick={() => setShowRefreshToken(s => !s)}>
+                        {showRefreshToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </Button>
+                      <Button variant="ghost" onClick={() => copyToClipboard(apiToken.refresh_token, 'refresh')}>
+                        {copiedField === 'refresh' ? <CheckCircle size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
+                      </Button>
+                    </div>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-400)', marginTop: '4px' }}>
+                      Use it against <code>POST /api/auth/refresh</code> to obtain a new access token without re-entering your password.
+                    </p>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
