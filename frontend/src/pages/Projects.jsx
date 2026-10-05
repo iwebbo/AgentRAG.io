@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Upload, Trash2, FileText, MessageSquare,
+  Plus, Trash2, FileText, MessageSquare,
   Loader2, GitBranch, Folder, RefreshCw, Database,
   Search, CheckCircle, XCircle, FolderKanban, Code2, BookOpen, Layers
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import Layout from '../components/layout/Layout';
 import Loading from '../components/common/Loading';
 import Alert from '../components/common/Alert';
 import ConnectSourceModal from './ConnectSourceModal';
+import UploadButton from '../components/documents/UploadButton';
 import api from '../services/api';
 
 // ── Icon picker by project name heuristic ────────────────────────────────────
@@ -137,7 +138,6 @@ const Projects = () => {
   const [showModal, setShowModal]         = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-  const [uploading, setUploading]         = useState({});
   const [syncing, setSyncing]             = useState({});
   const [integrations, setIntegrations]   = useState({});
   const [alert, setAlert]                 = useState(null);
@@ -246,41 +246,6 @@ const Projects = () => {
     } catch {
       showAlert('error', 'Failed to delete project');
     }
-  };
-
-  const uploadDocument = async (projectId, file) => {
-    setUploading(prev => ({ ...prev, [projectId]: true }));
-    const fd = new FormData();
-    fd.append('file', file);
-    try {
-      const res = await api.post(`/api/documents/${projectId}/upload`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      showAlert('success', `Document uploaded: ${res.data.filename}`);
-      pollDocumentStatus(res.data.document_id);
-    } catch (error) {
-      showAlert('error', error.response?.data?.detail || 'Upload failed');
-    } finally {
-      setUploading(prev => ({ ...prev, [projectId]: false }));
-    }
-  };
-
-  const pollDocumentStatus = (documentId) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.get(`/api/documents/${documentId}/status`);
-        if (res.data.status === 'completed') {
-          showAlert('success', `Processing complete: ${res.data.chunk_count} chunks`);
-          clearInterval(interval);
-          loadProjects();
-        } else if (res.data.status === 'failed') {
-          showAlert('error', `Processing failed: ${res.data.error_message}`);
-          clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
-      }
-    }, 2000);
   };
 
   const openConnectSource = (project) => {
@@ -509,34 +474,11 @@ const Projects = () => {
                     onClick={() => navigate(`/projects/${project.id}/documents`)}
                   />
                   {/* Upload */}
-                  <label
-                    style={{
-                      flex: 1,
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      gap: '5px',
-                      height: '32px',
-                      borderRadius: 'var(--radius)',
-                      border: '1px solid var(--gray-200)',
-                      background: 'transparent',
-                      color: uploading[project.id] ? 'var(--primary)' : 'var(--gray-600)',
-                      fontSize: '12px', fontWeight: '500',
-                      cursor: uploading[project.id] ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.12s',
-                    }}
-                    onMouseEnter={e => { if (!uploading[project.id]) { e.currentTarget.style.background = 'var(--gray-50)'; e.currentTarget.style.color = 'var(--gray-900)'; } }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = uploading[project.id] ? 'var(--primary)' : 'var(--gray-600)'; }}
-                  >
-                    {uploading[project.id]
-                      ? <><Loader2 size={13} className="animate-spin" /> Uploading</>
-                      : <><Upload size={13} /> Upload</>
-                    }
-                    <input
-                      type="file" hidden
-                      accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.markdown,.html,.htm,.xlsx,.xls,.csv,.rtf,.odt,.ods,.odp,.tex,.epub,.xml,.py,.js,.jsx,.ts,.tsx,.css,.java,.cpp,.c,.cs,.go,.rs,.php,.rb,.swift,.kt,.scala,.r,.groovy,.sh,.bash,.sql,.json,.yaml,.yml,.toml,.ini,.env,.jenkinsfile,.zip,.tar,.gz"
-                      onChange={e => uploadDocument(project.id, e.target.files[0])}
-                      disabled={uploading[project.id]}
-                    />
-                  </label>
+                  <UploadButton
+                    projectId={project.id}
+                    onMessage={showAlert}
+                    onSettled={loadProjects}
+                  />
                   {/* Connect source */}
                   <ActBtn
                     iconOnly

@@ -129,11 +129,11 @@ class DocumentProcessor:
             '.xls': DocumentProcessor._extract_code,
             '.csv': DocumentProcessor._extract_csv,
             '.rtf': DocumentProcessor._extract_code,
-            '.odt': DocumentProcessor._extract_code,
-            '.ods': DocumentProcessor._extract_code,
-            '.odp': DocumentProcessor._extract_code,
+            '.odt': DocumentProcessor._extract_odf,
+            '.ods': DocumentProcessor._extract_odf,
+            '.odp': DocumentProcessor._extract_odf,
             '.tex': DocumentProcessor._extract_code,
-            '.epub': DocumentProcessor._extract_code,
+            '.epub': DocumentProcessor._extract_epub,
             '.xml': DocumentProcessor._extract_code,
             
             # Code (tous gérés comme du texte brut)
@@ -195,7 +195,7 @@ class DocumentProcessor:
             with open(path, 'rb') as f:
                 pdf = pypdf.PdfReader(f)
                 for i, page in enumerate(pdf.pages):
-                    page_text = page.extract_text()
+                    page_text = page.extract_text() or ""
                     if page_text.strip():
                         text.append(f"--- Page {i+1} ---\n{page_text}")
             return "\n\n".join(text)
@@ -305,7 +305,7 @@ class DocumentProcessor:
         try:
             import csv
             text = []
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8-sig', errors='replace', newline='') as f:
                 reader = csv.reader(f)
                 for row in reader:
                     text.append(" | ".join(row))
@@ -319,24 +319,36 @@ class DocumentProcessor:
     @staticmethod
     def _extract_code(path: Path) -> str:
         """Extraction de fichiers code (préserve la syntaxe)"""
+        raw = path.read_bytes()
+        if b"\x00" in raw[:8192]:
+            raise ValueError(f"Format binaire non extractible : {path.name}")
         try:
-            content = path.read_text(encoding='utf-8')
-            
-            # Ajouter un header avec le nom du fichier et le langage
-            file_type = DocumentProcessor.SUPPORTED_FORMATS.get(path.suffix.lower(), 'Code File')
-            header = f"=== {path.name} ({file_type}) ===\n\n"
-            
-            return header + content
+            content = raw.decode('utf-8')
         except UnicodeDecodeError:
-            try:
-                content = path.read_text(encoding='latin-1')
-                file_type = DocumentProcessor.SUPPORTED_FORMATS.get(path.suffix.lower(), 'Code File')
-                header = f"=== {path.name} ({file_type}) ===\n\n"
-                return header + content
-            except Exception as e:
-                logger.error(f"Code extraction error: {e}")
-                raise
-    
+            content = raw.decode('latin-1')
+
+        file_type = DocumentProcessor.SUPPORTED_FORMATS.get(path.suffix.lower(), 'Code File')
+        return f"=== {path.name} ({file_type}) ===\n\n{content}"
+
+    @staticmethod
+    def _extract_odf(path: Path) -> str:
+        """Extraction OpenDocument (odt/ods/odp)"""
+        with zipfile.ZipFile(path) as archive:
+            xml = archive.read('content.xml')
+        return BeautifulSoup(xml, 'html.parser').get_text(separator="\n", strip=True)
+
+    @staticmethod
+    def _extract_epub(path: Path) -> str:
+        """Extraction EPUB"""
+        parts = []
+        with zipfile.ZipFile(path) as archive:
+            for name in archive.namelist():
+                if name.lower().endswith(('.xhtml', '.html', '.htm')):
+                    text = BeautifulSoup(archive.read(name), 'html.parser').get_text(separator="\n", strip=True)
+                    if text:
+                        parts.append(text)
+        return "\n\n".join(parts)
+
     # ================== CONFIG ==================
     
     @staticmethod

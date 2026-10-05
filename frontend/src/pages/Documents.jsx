@@ -9,6 +9,9 @@ import Layout from '../components/layout/Layout';
 import Alert from '../components/common/Alert';
 import Loading from '../components/common/Loading';
 import ConnectSourceModal from './ConnectSourceModal';
+import UploadQueuePanel from '../components/documents/UploadQueuePanel';
+import { useUploadQueue } from '../hooks/useUploadQueue';
+import { ACCEPT } from '../services/documentUpload';
 import api from '../services/api';
 
 // ── File type config ──────────────────────────────────────────────────────────
@@ -197,9 +200,6 @@ const SourceChip = ({ source, syncing, onSync, onDelete }) => {
   );
 };
 
-// ── Shared accept string ──────────────────────────────────────────────────────
-const ACCEPT = '.pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.markdown,.html,.htm,.xlsx,.xls,.csv,.rtf,.odt,.ods,.odp,.tex,.epub,.xml,.py,.js,.jsx,.ts,.tsx,.css,.java,.cpp,.c,.cs,.go,.rs,.php,.rb,.swift,.kt,.scala,.r,.groovy,.sh,.bash,.sql,.json,.yaml,.yml,.toml,.ini,.env,.jenkinsfile,.zip,.tar,.gz';
-
 // ── Table header cell ─────────────────────────────────────────────────────────
 const TH = ({ children, align = 'left' }) => (
   <th style={{
@@ -223,11 +223,20 @@ const Documents = () => {
   const [documents, setDocuments]             = useState([]);
   const [project, setProject]                 = useState(null);
   const [loading, setLoading]                 = useState(true);
-  const [uploading, setUploading]             = useState(false);
   const [syncing, setSyncing]                 = useState(false);
   const [connectedSources, setConnectedSources] = useState([]);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [alert, setAlert]                     = useState(null);
+
+  const refreshDocuments = async () => {
+    try {
+      const res = await api.get(`/api/documents/${projectId}/documents`);
+      setDocuments(Array.isArray(res.data) ? res.data : []);
+    } catch { /* keep current list */ }
+  };
+
+  const { items: uploads, enqueue, clear: clearUploads, busy: uploading } =
+    useUploadQueue(projectId, { onSettled: refreshDocuments });
 
   useEffect(() => {
     if (projectId) {
@@ -319,45 +328,15 @@ const Documents = () => {
     }
   };
 
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('file', file);
-    setUploading(true);
-    try {
-      const endpoint = projectId
-        ? `/api/documents/${projectId}/upload`
-        : '/api/documents/upload';
-      const res = await api.post(endpoint, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      showAlert('success', `"${file.name}" uploaded — processing…`);
-      pollDocumentStatus(res.data.document_id);
-    } catch (err) {
-      showAlert('error', err.response?.data?.detail || 'Upload failed');
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
+  const handleFiles = (e) => {
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+    enqueue(files);
   };
 
-  const pollDocumentStatus = (documentId) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.get(`/api/documents/${documentId}/status`);
-        if (res.data.status === 'completed') {
-          showAlert('success', `Processing complete — ${res.data.chunk_count} chunks`);
-          clearInterval(interval);
-          projectId ? fetchProjectAndDocuments() : fetchDocuments();
-        } else if (res.data.status === 'failed') {
-          showAlert('error', `Processing failed: ${res.data.error_message}`);
-          clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
-      }
-    }, 2000);
+  const handleDrop = (e) => {
+    e.preventDefault();
+    enqueue(Array.from(e.dataTransfer.files));
   };
 
   const handleDelete = async (docId) => {
@@ -387,7 +366,11 @@ const Documents = () => {
         @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.3 } }
       `}</style>
 
-      <div style={{ padding: 'var(--spacing-8) var(--spacing-6)', maxWidth: '1100px', margin: '0 auto' }}>
+      <div
+        style={{ padding: 'var(--spacing-8) var(--spacing-6)', maxWidth: '1100px', margin: '0 auto', minHeight: '70vh' }}
+        onDragOver={projectId ? (e) => e.preventDefault() : undefined}
+        onDrop={projectId ? handleDrop : undefined}
+      >
 
         {/* Alert */}
         {alert && (
@@ -395,6 +378,8 @@ const Documents = () => {
             <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />
           </div>
         )}
+
+        <UploadQueuePanel items={uploads} onClear={clearUploads} />
 
         {/* ── Header ── */}
         <div style={{ marginBottom: '1.5rem' }}>
@@ -470,7 +455,7 @@ const Documents = () => {
               )}
 
               {/* Upload */}
-              <label
+              {projectId && <label
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '5px',
                   height: '32px', padding: '0 14px',
@@ -478,7 +463,7 @@ const Documents = () => {
                   background: 'var(--gray-900)', color: 'white',
                   border: 'none',
                   fontSize: '12px', fontWeight: '500',
-                  cursor: uploading ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                   opacity: uploading ? 0.7 : 1,
                   transition: 'opacity 0.15s',
                   whiteSpace: 'nowrap',
@@ -490,8 +475,8 @@ const Documents = () => {
                   ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Uploading…</>
                   : <><Upload size={13} /> Upload</>
                 }
-                <input type="file" hidden accept={ACCEPT} onChange={handleUpload} disabled={uploading} />
-              </label>
+                <input type="file" multiple hidden accept={ACCEPT} onChange={handleFiles} />
+              </label>}
             </div>
           </div>
 
@@ -540,10 +525,10 @@ const Documents = () => {
             <div>
               <p style={{ fontWeight: '500', color: 'var(--gray-700)', marginBottom: '4px' }}>No documents yet</p>
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)' }}>
-                Upload a file or connect an external source
+                Upload files or connect an external source
               </p>
             </div>
-            <label style={{
+            {projectId && <label style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '8px 20px',
               background: 'var(--gray-900)', color: 'white',
@@ -552,8 +537,8 @@ const Documents = () => {
             }}>
               <Upload size={14} />
               Upload document
-              <input type="file" hidden accept={ACCEPT} onChange={handleUpload} disabled={uploading} />
-            </label>
+              <input type="file" multiple hidden accept={ACCEPT} onChange={handleFiles} />
+            </label>}
           </div>
         ) : (
           /* ── Documents table ── */

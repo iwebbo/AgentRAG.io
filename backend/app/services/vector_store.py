@@ -12,6 +12,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
+CHROMA_BATCH_SIZE = 500
+
 
 # ── ChromaDB Backend ──────────────────────────────────────────────────────────
 
@@ -75,10 +77,14 @@ class ChromaBackend:
         embeddings: Optional[List[List[float]]] = None
     ):
         col = self.get_or_create_collection(project_id)
-        kwargs: Dict[str, Any] = dict(documents=documents, metadatas=metadatas, ids=ids)
-        if embeddings:
-            kwargs["embeddings"] = embeddings
-        col.add(**kwargs)
+        for i in range(0, len(documents), CHROMA_BATCH_SIZE):
+            batch = slice(i, i + CHROMA_BATCH_SIZE)
+            kwargs: Dict[str, Any] = dict(
+                documents=documents[batch], metadatas=metadatas[batch], ids=ids[batch]
+            )
+            if embeddings:
+                kwargs["embeddings"] = embeddings[batch]
+            col.add(**kwargs)
         logger.info(f"✅ ChromaDB: {len(documents)} chunks added to project {project_id}")
 
     def query(
