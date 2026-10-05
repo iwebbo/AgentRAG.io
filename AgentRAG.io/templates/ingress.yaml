@@ -1,29 +1,44 @@
-{{- if .Values.ingress.enabled }}
+# charts/theai/templates/ingress.yaml
+{{- $ingressConfig := dict "ingress" (default (dict) .Values.ingress) }}
+{{- if $ingressConfig.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "rag.name" . }}-ingress
+  name: {{ include "rag.name" . }}
+  namespace: {{ .Values.namespace.name }}
   labels:
     {{- include "rag.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with $ingressConfig.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if .Values.ingress.className }}
-  ingressClassName: {{ .Values.ingress.className }}
+  {{- if $ingressConfig.ingress.className }}
+  ingressClassName: {{ $ingressConfig.ingress.className }}
+  {{- end }}
+  {{- if $ingressConfig.ingress.tls }}
+  tls:
+    {{- range $ingressConfig.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- if .secretName }}
+      secretName: {{ .secretName }}
+      {{- end }}
+    {{- end }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
+    {{- range $ingressConfig.ingress.hosts }}
     - host: {{ .host | quote }}
       http:
         paths:
           {{- range .paths }}
           - path: {{ .path }}
-            pathType: {{ .pathType }}
+            pathType: {{ .pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ include "rag.name" $ }}-{{ .service }}
+                name: {{ include "rag.name" $ }}-{{ .component }}
                 port:
                   number: {{ .port }}
           {{- end }}

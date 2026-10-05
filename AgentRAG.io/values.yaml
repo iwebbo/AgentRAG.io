@@ -7,13 +7,16 @@ replicaCount: 1
 registry: ghcr.io
 imagePullSecrets: []
 
+namespace:
+  name: agentragio
+
 # Backend FastAPI
 backend:
   enabled: true
   name: backend
   image:
     repository: ghcr.io/iwebbo/AgentRAG.io/backend
-    tag: "latest"
+    tag: ""
     pullPolicy: IfNotPresent
   replicas: 2
   service:
@@ -39,7 +42,7 @@ frontend:
   name: frontend
   image:
     repository: ghcr.io/iwebbo/AgentRAG.io/frontend
-    tag: "latest"
+    tag: ""
     pullPolicy: IfNotPresent
   replicas: 2
   service:
@@ -141,37 +144,6 @@ secrets:
     OLLAMA_URL: "http://ollama.default.svc.cluster.local:11434"
     OPENAI_API_KEY: ""
     ANTHROPIC_API_KEY: ""
-    # Feature/opeansearchadd
-    OPENSEARCH_HOST: "opensearch.domain.local"
-    OPENSEARCH_PORT: "9200"
-    OPENSEARCH_USER: "admin"
-    OPENSEARCH_PASSWORD: "admin"
-    OPENSEARCH_USE_SSL: "true"
-    OPENSEARCH_VERIFY_CERTS: "false"
-    OPENSEARCH_EMBEDDING_DIM: "384"
-
-# Ingress
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-  hosts:
-    - host: rag.local
-      paths:
-        - path: /
-          pathType: Prefix
-          service: frontend
-          port: 80
-        - path: /api
-          pathType: Prefix
-          service: backend
-          port: 8000
-  tls:
-    enabled: false
 
 serviceAccount:
   create: true

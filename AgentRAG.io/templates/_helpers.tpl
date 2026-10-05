@@ -2,7 +2,7 @@
 Expand the name of the chart.
 */}}
 {{- define "rag.name" -}}
-rag-multi-expert
+agentragio
 {{- end }}
 
 {{/*
