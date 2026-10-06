@@ -10,8 +10,6 @@ keywords:
   - ai-assistant
   - langchain
   - chromadb
-  - agent
-  - mcp
 
 home: https://github.com/iwebbo/AgentRAG.io
 sources:
