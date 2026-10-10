@@ -36,6 +36,28 @@ backend:
     - name: WORKERS
       value: "4"
 
+# Scheduler worker
+scheduler:
+  enabled: true
+  replicas: 1
+  terminationGracePeriodSeconds: 60
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "250m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  env:
+    - name: LOG_LEVEL
+      value: "INFO"
+    - name: SCHEDULER_POLL_SECONDS
+      value: "5"
+    - name: SCHEDULER_MAX_CONCURRENCY
+      value: "2"
+    - name: SCHEDULER_RUN_TIMEOUT_SECONDS
+      value: "1800"
+
 # Frontend Vue 3
 frontend:
   enabled: true
