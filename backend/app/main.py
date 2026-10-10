@@ -5,7 +5,7 @@ import logging
 
 from app.config import get_settings
 from app.database import init_db
-from app.routes import auth, chat, conversations, providers, templates, projects, documents, rag_chat, integrations, agents, opeansearch, skills, hosts, exports
+from app.routes import auth, chat, conversations, providers, templates, projects, documents, rag_chat, integrations, agents, opeansearch, skills, hosts, exports, scheduler, notifications
 
 # Configure logging
 logging.basicConfig(
@@ -93,6 +93,8 @@ app.include_router(opeansearch.router)
 app.include_router(skills.router)
 app.include_router(hosts.router)
 app.include_router(exports.router)
+app.include_router(scheduler.router)
+app.include_router(notifications.router)
 
 # Global exception handler
 @app.exception_handler(Exception)

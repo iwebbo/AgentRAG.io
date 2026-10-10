@@ -144,6 +144,25 @@ secrets:
     OLLAMA_URL: "http://ollama.default.svc.cluster.local:11434"
     OPENAI_API_KEY: ""
     ANTHROPIC_API_KEY: ""
+    # Feature/opeansearchadd
+    OPENSEARCH_HOST: "opensearch.local"
+    OPENSEARCH_PORT: "9200"
+    OPENSEARCH_USER: "admin"
+    OPENSEARCH_PASSWORD: "password"
+    OPENSEARCH_USE_SSL: "true"
+    OPENSEARCH_VERIFY_CERTS: "false"
+    OPENSEARCH_EMBEDDING_DIM: "384"
+    # Feature/Scheduled
+    APP_BASE_URL: ""
+    SMTP_HOST: ""
+    SMTP_PORT: "587"
+    SMTP_USER: ""
+    SMTP_PASSWORD: ""
+    SMTP_FROM: ""
+    SMTP_STARTTLS: "true"
+    SMTP_USE_SSL: "false"
+    SMTP_VERIFY_CERT: "true"
+
 
 serviceAccount:
   create: true

@@ -50,6 +50,27 @@ class Settings(BaseSettings):
     # all-mpnet-base-v2 → 768
     OPENSEARCH_EMBEDDING_DIM: int = 384
 
+    # ── Scheduler ─────────────────────────────────────────────────────────────
+    SCHEDULER_POLL_SECONDS: int = 5
+    SCHEDULER_MAX_CONCURRENCY: int = 2
+    SCHEDULER_RUN_TIMEOUT_SECONDS: int = 1800
+    SCHEDULER_STALE_SECONDS: int = 2100
+    SCHEDULER_MIN_INTERVAL_MINUTES: int = 5
+    SCHEDULER_HEARTBEAT_FILE: str = "/tmp/scheduler.heartbeat"
+
+    # ── Notifications (platform SMTP) ─────────────────────────────────────────
+    # Email notifications are disabled while SMTP_HOST (or the sender) is empty.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_STARTTLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_VERIFY_CERT: bool = True
+    # Public URL of the UI, used to build links in notification emails
+    APP_BASE_URL: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins string to list."""

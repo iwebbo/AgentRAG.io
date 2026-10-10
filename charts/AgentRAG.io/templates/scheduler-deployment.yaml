@@ -1,0 +1,67 @@
+{{- if and .Values.backend.enabled .Values.scheduler.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rag.name" . }}-scheduler
+  labels:
+    {{- include "rag.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: {{ .Values.scheduler.replicas }}
+  # Recreate: never run two scheduler pods against the same RWO volume during a rollout
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "rag.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      labels:
+        {{- include "rag.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: scheduler
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      terminationGracePeriodSeconds: {{ .Values.scheduler.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: scheduler
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        # Same image as the backend: only the command differs
+        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        command: ["python", "-m", "app.services.scheduler.worker"]
+        envFrom:
+        - secretRef:
+            name: {{ .Values.secrets.name }}
+        {{- with .Values.scheduler.env }}
+        env:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data
+        - name: documents
+          mountPath: {{ .Values.documents.storage.mountPath }}
+        resources:
+          {{- toYaml .Values.scheduler.resources | nindent 10 }}
+        # The worker has no HTTP port: it touches a heartbeat file on every loop
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - 'test -f /tmp/scheduler.heartbeat && [ $(( $(date +%s) - $(stat -c %Y /tmp/scheduler.heartbeat) )) -lt 120 ]'
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: app-data
+        emptyDir: {}
+      - name: documents
+        persistentVolumeClaim:
+          claimName: {{ include "rag.name" . }}-documents-pvc
+{{- end }}

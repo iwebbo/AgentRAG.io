@@ -1,7 +1,7 @@
 <img width="600" height="600" alt="agentragio" src="https://github.com/user-attachments/assets/93dfaf79-24a1-439b-9c63-724917a30554" />
 
 # AgentRAG.io
-**AgentRAG.io is a self-hosted, a RAG-Powered Intelligence, a MCP Integration, multi-provider platform featuring SSH & WinRM remote execution. It allows you to modularize your infrastructure and operational workflows by instantiating complex autonomous agents using a single file.**
+**AgentRAG.io is a self-hosted, a RAG-Powered Intelligence, a MCP Integration, multi-provider platform featuring SSH & WinRM remote execution. It allows you to modularize your infrastructure and operational workflows by instantiating complex autonomous agents using a single file, scheduling basic task or Agent**
 
 [![.MD](https://img.shields.io/badge/Documentation-Example_of_Skills_.md-blue?style=for-the-badge&logo=markdown)](https://iwebbo.github.io/products/agentrag.html)
 
@@ -13,29 +13,13 @@
 ![Opensearch](https://img.shields.io/badge/Opensearch-0078D6?style=for-the-badge&logo=Opensearch&logoColor=black)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-0078D6?style=for-the-badge&logo=ChromaDB&logoColor=black)
 
-## Table of Contents
-
-- [Overview](#-overview)
-- [What's New: MCP Agents](#-whats-new-mcp-agents)
-- [Demo](#-demo)
-- [Features](#-features)
-- [Agent Architecture](#-agent-architecture)
-- [Available Agents](#-available-agents)
-- [Tech Stack](#-tech-stack)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [API Documentation](#-api-documentation)
-- [Usage Guide](#-usage-guide)
-- [Development](#-development)
-- [Contributing](#-contributing)
-- [License](#-license)
-
 ---
 
 ## Overview
 
 AgentRAG.io extends RAG.io with autonomous MCP agents that combine RAG intelligence with external tool execution. Built for enterprises and developers who need AI that acts, not just answers.
 
+- **Scheduler**: Schedule existing agents (deterministic, fixed arguments) or simple LLM prompts on a cron-based frequency, with per-task approval modes (manual / auto / skip-all) and result delivery by in-app notification or email.
 - **Skill-Based Agents**: Instantiate any agent from a single .md file — define purpose, MCP servers, and RAG context in frontmatter YAML, register via API, run immediately.
 - **Remote Execution**: Operate Linux servers over SSH (Nginx, Apache, Docker, Kubernetes, PostgreSQL, MySQL) and Windows servers over WinRM (IIS, SQL Server, PowerShell) — credentials resolved securely from DB, never in plain config.
 - **Built-in Agent Library**: Code generation, branch code review, legal advisory, accounting automation, travel planning, email management, web search — ready out of the box.
@@ -46,55 +30,46 @@ AgentRAG.io extends RAG.io with autonomous MCP agents that combine RAG intellige
 - **Fine-Grained Control**: Configure agent behavior, timeouts, retries, and MCP server access
 - **Project-Based Organization**: Isolate documents, conversations, and agent workflows by project
 
-### Core Platform Features (from RAG.io)
+## Core AgentRAG Features (from RAG.io)
 
-All the powerful RAG features you know and love:
+All the RAG.io features remain unchanged:
 
-- **Multi-Provider LLM Support**: OpenAI, Claude, Gemini, Ollama, and 10+ providers
+#### **Document Processing**
+- **Supported Formats**: PDF, DOCX, TXT, MD, HTML, CSV, JSON (50+ file types)
+- **Smart Chunking**: Adaptive chunk size (100-2000 tokens) with configurable overlap
+- **Metadata Extraction**: Automatic filename, page number, and document type tagging
+- **Token Tracking**: Real-time token counting for cost estimation
+- **Batch Processing**: Background async processing with progress tracking
+
+#### **Semantic Search**
+- **Vector Database**: ChromaDB with HNSW indexing, Opensearch
+- **Embedding Models**: sentence-transformers/all-MiniLM-L6-v2 (default), OpenAI embeddings
+- **Adjustable top-k**: Dynamic retrieval (1-20 chunks) based on model context
+- **Distance Scoring**: Cosine similarity with configurable threshold
+- **Metadata Filtering**: Filter by document type, date, or custom tags
+
+### **Multi-Provider & Smart Chunking**
+
+- **Multi-Provider LLM Support**: OpenAI, Claude, Gemini, Ollama, vLLM, Ollama, LMStudio, SGLang and 10+ providers
 - **Intelligent Document Search**: ChromaDB-powered semantic search
 - **Smart Chunking & Embeddings**: Adaptive chunk size with overlap optimization
 - **Enterprise Security**: JWT authentication, AES-256 encryption, GDPR compliance
 
----
+#### **Multi-Provider LLM Support**
 
-## What's New: MCP Agents
-
-AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intelligence:
-
-### Agent Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       Agent Layer                           │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐             │
-│  │    Code    │  │   Legal    │  │ Accounting │  + More     │
-│  │ Generator  │  │  Advisor   │  │  Advisor   │             │
-│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘             │
-│        │                │                │                  │
-│  ┌─────▼────────────────▼────────────────▼──────┐          │
-│  │          MCP Client (Protocol Layer)          │          │
-│  └─────┬────────────────┬────────────────┬───────┘          │
-│        │                │                │                  │
-│  ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐              │
-│  │   GitHub  │   │   Linter  │   │ Test Runner│  + More     │
-│  │   Server  │   │   Server  │   │   Server  │              │
-│  └───────────┘   └───────────┘   └───────────┘              │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                        RAG Layer                            │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                 Context & LLM Manager                 │  │
-│  │  • Semantic Search Orchestration   • Multi-LLM Prov.  │  │
-│  └───────────────┬───────────────────────┬───────────────┘  │
-│                  │                       │                  │
-│        ┌─────────▼─────────┐   ┌─────────▼─────────┐        │
-│        │     ChromaDB      │   │    OpenSearch     │        │
-│        │  (Local/Testing)  │   │   (Prod/Scale)    │        │
-│        └───────────────────┘   └───────────────────┘        │
-└─────────────────────────────────────────────────────────────┘
-```
+| Provider | Models | Context Window | Streaming | Temperature |
+|----------|--------|----------------|-----------|-------------|
+| **OpenAI** | GPT-4, GPT-4-turbo, o1-preview | 8K-128K | ✅ | 0.0-2.0 |
+| **Anthropic** | Claude 3.5 Sonnet, Opus, Haiku | 200K | ✅ | 0.0-1.0 |
+| **Google** | Gemini 1.5 Pro/Flash, 2.0 | 2M | ✅ | 0.0-2.0 |
+| **Ollama** | Llama 3.1, Mistral, Phi-3 | 8K-128K | ✅ | 0.0-2.0 |
+| **Groq** | Llama 3, Mixtral | 32K | ✅ | 0.0-2.0 |
+| **OpenRouter** | 200+ models | Varies | ✅ | 0.0-2.0 |
+| **HuggingFace** | Custom models | Varies | ✅ | 0.0-2.0 |
+| **vLLM** | Custom models | Varies | ✅ | 0.0-2.0 |
+| **LMStudio** | Custom models | Varies | ✅ | 0.0-2.0 |
+| **Ollama** | Custom models | Varies | ✅ | 0.0-2.0 |
+| **SGLang** | Custom models | Varies | ✅ | 0.0-2.0 |
 
 ---
 
@@ -119,9 +94,7 @@ AgentRAG.io adds a powerful **agent layer** on top of RAG.io's document intellig
 
 ---
 
-## Features
-
-### MCP Servers
+## MCP Servers
 
 MCP (Model Context Protocol) servers extend agent capabilities by providing structured tool access to external services. Declare servers in your agent config or `.md` frontmatter — the backend resolves credentials and routes tool calls automatically.
 
@@ -138,7 +111,7 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 | Test Runner | `test_runner` | stdio | none | `run_tests`, `run_single_test`, `get_coverage` |
 
  
-### Autonomous Agents (NEW)
+## Agentic - Agent
 
 #### **Agent Capabilities**
 - **RAG-Powered Context**: Agents automatically retrieve relevant context from your document knowledge base
@@ -171,36 +144,6 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 | **SonarQube Security** | `sonarqube` | Projects inventory, vulnerabilities, security hotspots, quality gate, and LLM-assisted remediation (modes: `projects`, `overview`, `issues`, `hotspots`, `remediate`) | `sonarqube` | Optional — repository project (`use_rag: true` + `project_id`) |
 
 | *(Custom)* | `skill` | Build your own specialized agent | Any MCP server | Any project |
-
-### Core RAG Features (from RAG.io)
-
-All the RAG.io features remain unchanged:
-
-#### **Document Processing**
-- **Supported Formats**: PDF, DOCX, TXT, MD, HTML, CSV, JSON (50+ file types)
-- **Smart Chunking**: Adaptive chunk size (100-2000 tokens) with configurable overlap
-- **Metadata Extraction**: Automatic filename, page number, and document type tagging
-- **Token Tracking**: Real-time token counting for cost estimation
-- **Batch Processing**: Background async processing with progress tracking
-
-#### **Semantic Search**
-- **Vector Database**: ChromaDB with HNSW indexing, Opensearch
-- **Embedding Models**: sentence-transformers/all-MiniLM-L6-v2 (default), OpenAI embeddings
-- **Adjustable top-k**: Dynamic retrieval (1-20 chunks) based on model context
-- **Distance Scoring**: Cosine similarity with configurable threshold
-- **Metadata Filtering**: Filter by document type, date, or custom tags
-
-#### **Multi-Provider LLM Support**
-
-| Provider | Models | Context Window | Streaming | Temperature |
-|----------|--------|----------------|-----------|-------------|
-| **OpenAI** | GPT-4, GPT-4-turbo, o1-preview | 8K-128K | ✅ | 0.0-2.0 |
-| **Anthropic** | Claude 3.5 Sonnet, Opus, Haiku | 200K | ✅ | 0.0-1.0 |
-| **Google** | Gemini 1.5 Pro/Flash, 2.0 | 2M | ✅ | 0.0-2.0 |
-| **Ollama** | Llama 3.1, Mistral, Phi-3 | 8K-128K | ✅ | 0.0-2.0 |
-| **Groq** | Llama 3, Mixtral | 32K | ✅ | 0.0-2.0 |
-| **OpenRouter** | 200+ models | Varies | ✅ | 0.0-2.0 |
-| **HuggingFace** | Custom models | Varies | ✅ | 0.0-2.0 |
 
 ---
 
@@ -265,7 +208,6 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 docker run -d \
   --name agentrag-backend \
   --network agentrag-network \
-  --network-alias backend \
   -p 8000:8000 \
   -e SECRET_KEY="SECRET_KEY" \
   -e ALGORITHM="HS256" \
@@ -282,6 +224,15 @@ docker run -d \
   -e OPENSEARCH_USE_SSL="true" \
   -e OPENSEARCH_VERIFY_CERTS="false" \
   -e OPENSEARCH_EMBEDDING_DIM="384" \
+  -e APP_BASE_URL="" \
+  -e SMTP_HOST="smtp.gmail.com" \
+  -e SMTP_PORT="587" \
+  -e SMTP_USER="your_smtp_username@example.com" \
+  -e SMTP_PASSWORD="YOUR_SMTP_ACCESS_TOKEN" \
+  -e SMTP_FROM="agentragio@aecoding.local" \
+  -e SMTP_STARTTLS="true" \
+  -e SMTP_USE_SSL="false" \
+  -e SMTP_VERIFY_CERT="true" \
   ghcr.io/iwebbo/agentrag.io/backend:sha-fadc6a0
 ```
 
@@ -813,147 +764,6 @@ curl -k -X POST https://docvector.local/api/ingest \
   -H "Content-Type: application/json" \
   -d '{"recreate": false, "auto_cleanup": true}'
 ```
-
----
-
-## API Documentation
-```bash
-API Docs: http://localhost:8000/docs
-```
-
-### Agent API (NEW)
-
-#### Create Agent
-
-```bash
-POST /api/agents/
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "name": "My Code Generator",
-  "type": "code_generator",
-  "description": "Generates Python code with tests",
-  "project_id": "uuid",
-  "config": {
-    "repo": "myorg/myrepo",
-    "auto_test": true
-  },
-  "mcp_config": {
-    "github": {"token": "ghp_..."}
-  }
-}
-
-Response:
-{
-  "id": "uuid",
-  "name": "My Code Generator",
-  "type": "code_generator",
-  "status": "idle",
-  "created_at": "2024-01-15T10:00:00Z"
-}
-```
-
-#### Execute Agent (Streaming)
-
-```bash
-POST /api/agents/{agent_id}/execute/stream
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "input_data": {
-    "prompt": "Add OAuth2 authentication",
-    "target_files": ["backend/auth.py"]
-  }
-}
-
-Response (Server-Sent Events):
-event: log
-data: {"level": "info", "message": "Starting code generation..."}
-
-event: progress
-data: {"step": "generating_code", "percent": 30}
-
-event: log
-data: {"level": "success", "message": "✅ All tests passed"}
-
-event: result
-data: {"files_created": ["backend/auth.py"], "tests_passed": 15}
-
-event: done
-data: {"execution_id": "uuid", "status": "completed", "tokens_used": 2345}
-```
-
-#### List Agents
-
-```bash
-GET /api/agents/
-Authorization: Bearer {token}
-
-Response:
-[
-  {
-    "id": "uuid",
-    "name": "My Code Generator",
-    "type": "code_generator",
-    "status": "idle",
-    "executions_count": 12,
-    "last_execution": "2024-01-15T14:30:00Z"
-  },
-  ...
-]
-```
-
-#### Get Agent Execution
-
-```bash
-GET /api/agents/executions/{execution_id}
-Authorization: Bearer {token}
-
-Response:
-{
-  "id": "uuid",
-  "agent_id": "uuid",
-  "status": "completed",
-  "input_data": {...},
-  "result": {...},
-  "logs": [...],
-  "tokens_used": 2345,
-  "mcp_calls": {"github": 5, "test_runner": 3},
-  "started_at": "2024-01-15T14:30:00Z",
-  "completed_at": "2024-01-15T14:35:00Z"
-}
-```
----
-
-## Usage Guide
-
-### Create Your First Agent
-
-```bash
-# Via UI: Agents → New Agent → Code Generator
-# Or via API:
-curl -X POST http://localhost:8000/api/agents/ \
-  -H "Authorization: Bearer {token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Code Generator",
-    "type": "code_generator",
-    "project_id": "uuid",
-    "config": {"repo": "myorg/myrepo", "auto_test": true},
-    "mcp_config": {"github": {"token": "ghp_..."}}
-  }'
-```
-
-### Monitor Agent Execution
-
-Check **Agents → Executions** for:
-- Real-time execution logs
-- Token usage and costs
-- MCP call counts
-- Success/failure status
-- Generated outputs
 
 ---
 
