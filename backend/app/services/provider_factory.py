@@ -683,6 +683,29 @@ class GroqProvider(OpenAIProvider):
             "openai/gpt-oss-20b"
         ]
 
+class SGLangProvider(OpenAIProvider):
+    """SGLang provider - Hérite de OpenAIProvider (serveur OpenAI-compatible, port 30000 par défaut)"""
+
+    def __init__(self, api_key: Optional[str] = None, base_url: str = "http://localhost:30000/v1", config: Dict[str, Any] = None):
+        super().__init__(api_key or "sglang", base_url, config)  # clé bidon si le serveur n'a pas --api-key
+
+    async def test_connection(self) -> tuple[bool, str, Optional[int]]:
+        """Test via GET /v1/models (le ping chat d'OpenAIProvider impose un nom de modèle)"""
+        try:
+            start_time = time.time()
+            response = await self.client.models.list()
+            latency = int((time.time() - start_time) * 1000)
+            return True, f"SGLang OK • {len(response.data)} model(s)", latency
+        except Exception as e:
+            return False, f"SGLang error: {str(e)}", None
+
+    async def get_available_models(self) -> list:
+        try:
+            response = await self.client.models.list()
+            return [model.id for model in response.data]
+        except Exception:
+            return ["meta-llama/Llama-3.1-8B-Instruct"]
+
 class ProviderFactory:
     """Factory to create LLM providers"""
     
@@ -709,13 +732,14 @@ class ProviderFactory:
             "openrouter": OpenRouterProvider,
             "groq": GroqProvider,
             "grok": GrokProvider,
+            "sglang": SGLangProvider,
         }
         
         provider_class = providers.get(provider_name.lower())
         if not provider_class:
             raise ValueError(f"Unknown provider: {provider_name}")
         
-        if provider_name.lower() in ["ollama", "lmstudio", "localai", "lmdeploy", "oobabooga", "vllm"]:
+        if provider_name.lower() in ["ollama", "lmstudio", "localai", "lmdeploy", "oobabooga", "vllm", "sglang"]:
             return provider_class(api_key=api_key, base_url=base_url or provider_class.__init__.__defaults__[1], config=config)
         else:
             if not api_key:

@@ -151,6 +151,7 @@ const PROVIDER_NAMES = {
   vllm:        'vLLM',
   lmdeploy:    'LMDeploy',
   oobabooga:   'Text Gen WebUI',
+  sglang:      'SGLang',
 };
 
 // ── Main component ────────────────────────────────────────────────────────────

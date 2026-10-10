@@ -259,6 +259,11 @@ async def get_available_providers(
                 "requires_api_key": False,
                 "models": await llm_service.get_available_models("lmdeploy")
             },
+            "sglang": {
+                "name": "SGLang",
+                "requires_api_key": False,
+                "models": await llm_service.get_available_models("sglang")
+            },
         }
 
 

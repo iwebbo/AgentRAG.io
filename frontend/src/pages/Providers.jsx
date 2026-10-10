@@ -20,6 +20,7 @@ const PROVIDER_CONFIG = [
   { value: 'oobabooga',   label: 'Text Generation WebUI',         category: 'local', requiresKey: false, defaultUrl: 'http://localhost:5000/v1' },
   { value: 'vllm',        label: 'vLLM',                          category: 'local', requiresKey: false, defaultUrl: 'http://localhost:8000/v1' },
   { value: 'lmdeploy',    label: 'LMDeploy / OpenXLab',           category: 'local', requiresKey: false, defaultUrl: 'http://localhost:23333/v1' },
+  { value: 'sglang',      label: 'SGLang',                        category: 'local', requiresKey: false, defaultUrl: 'http://localhost:30000/v1' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
