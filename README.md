@@ -233,7 +233,7 @@ docker run -d \
   -e SMTP_STARTTLS="true" \
   -e SMTP_USE_SSL="false" \
   -e SMTP_VERIFY_CERT="true" \
-  ghcr.io/iwebbo/agentrag.io/backend:sha-fadc6a0
+  ghcr.io/iwebbo/agentrag.io/backend:latest
 ```
 
 ### Run Frontend
@@ -242,7 +242,7 @@ docker run -d \
   --name agentrag-frontend \
   --network agentrag-network \
   -p 80:80 \
-  ghcr.io/iwebbo/agentrag.io/frontend:sha-fadc6a0
+  ghcr.io/iwebbo/agentrag.io/frontend:latest
 ```
 
 ---
