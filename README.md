@@ -4,7 +4,7 @@ Kubernetes deployment chart for AgentRAG.io - Intelligent RAG with Autonomous Ag
 
 ## Add Repository
 ```bash
-helm repo add rag https://iwebbo.github.io/AgentRAG.io/
+helm repo add agentragio https://iwebbo.github.io/AgentRAG.io/
 helm repo update
 ```
 
@@ -44,6 +44,16 @@ secrets:
     OPENSEARCH_USE_SSL: "true"
     OPENSEARCH_VERIFY_CERTS: "false"
     OPENSEARCH_EMBEDDING_DIM: "384"
+    # Feature/Scheduled
+    APP_BASE_URL: ""
+    SMTP_HOST: "smtp.server.com"
+    SMTP_PORT: "587"
+    SMTP_USER: "email@server.com"
+    SMTP_PASSWORD: "password/token"
+    SMTP_FROM: "emailfrom@server.com"
+    SMTP_STARTTLS: "true"
+    SMTP_USE_SSL: "false"
+    SMTP_VERIFY_CERT: "true"
 
 ```
 

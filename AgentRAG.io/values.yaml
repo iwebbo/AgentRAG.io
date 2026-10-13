@@ -2,21 +2,18 @@
 
 nameOverride: ""
 fullnameOverride: ""
-
 replicaCount: 1
 registry: ghcr.io
 imagePullSecrets: []
-
 namespace:
   name: agentragio
-
 # Backend FastAPI
 backend:
   enabled: true
   name: backend
   image:
-    repository: ghcr.io/iwebbo/AgentRAG.io/backend
-    tag: ""
+    repository: ghcr.io/iwebbo/agentrag.io/backend
+    tag: "1.1.76"
     pullPolicy: IfNotPresent
   replicas: 2
   service:
@@ -35,7 +32,6 @@ backend:
       value: "INFO"
     - name: WORKERS
       value: "4"
-
 # Scheduler worker
 scheduler:
   enabled: true
@@ -57,14 +53,13 @@ scheduler:
       value: "2"
     - name: SCHEDULER_RUN_TIMEOUT_SECONDS
       value: "1800"
-
 # Frontend Vue 3
 frontend:
   enabled: true
   name: frontend
   image:
-    repository: ghcr.io/iwebbo/AgentRAG.io/frontend
-    tag: ""
+    repository: ghcr.io/iwebbo/agentrag.io/frontend
+    tag: "1.1.76"
     pullPolicy: IfNotPresent
   replicas: 2
   service:
@@ -78,7 +73,6 @@ frontend:
     limits:
       memory: "256Mi"
       cpu: "250m"
-
 # PostgreSQL
 postgres:
   enabled: true
@@ -107,14 +101,13 @@ postgres:
   database: rag_db
   user: raguser
   password: "changeMeRag123!"
-
 # ChromaDB Vector Store
 chroma:
   enabled: true
   name: chroma
   image:
     repository: chromadb/chroma
-    tag: "latest"
+    tag: ""
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -132,7 +125,6 @@ chroma:
     limits:
       memory: "4Gi"
       cpu: "2000m"
-
 # Shared document storage
 documents:
   storage:
@@ -140,28 +132,24 @@ documents:
     className: "standard"
     size: 50Gi
     mountPath: /app/data/documents
-
 # Secrets
 secrets:
   create: true
   name: rag-secrets
   data:
     # Database
-    DATABASE_URL: "postgresql://raguser:changeMeRag123!@rag-multi-expert-postgres:5432/rag_db"
-    POSTGRES_SERVER: "rag-multi-expert-postgres"
+    DATABASE_URL: "postgresql://raguser:changeMeRag123!@agentragio-postgres:5432/rag_db"
+    POSTGRES_SERVER: "agentragio-postgres"
     POSTGRES_PORT: "5432"
     POSTGRES_DB: "rag_db"
     POSTGRES_USER: "raguser"
     POSTGRES_PASSWORD: "changeMeRag123!"
-    
     # ChromaDB
-    CHROMA_HOST: "rag-multi-expert-chroma"
+    CHROMA_HOST: "agentragio-chroma"
     CHROMA_PORT: "8001"
-    
     # JWT
     SECRET_KEY: "changeMeSecretKeyForJWT123"
     ENCRYPTION_KEY: "changeMeEncryptionKey123="
-    
     # LLM Providers (API Keys - Override en production)
     OLLAMA_URL: "http://ollama.default.svc.cluster.local:11434"
     OPENAI_API_KEY: ""
@@ -184,24 +172,19 @@ secrets:
     SMTP_STARTTLS: "true"
     SMTP_USE_SSL: "false"
     SMTP_VERIFY_CERT: "true"
-
-
 serviceAccount:
   create: true
   name: "rag-sa"
-
 podAnnotations: {}
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
   fsGroup: 1000
-
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
-
 nodeSelector: {}
 tolerations: []
 affinity: {}
