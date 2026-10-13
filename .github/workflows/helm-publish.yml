@@ -102,13 +102,13 @@ jobs:
           create: true
           name: rag-secrets
           data:
-            DATABASE_URL: "postgresql://raguser:changeMeRag123!@rag-multi-expert-postgres:5432/rag_db"
-            POSTGRES_SERVER: "rag-multi-expert-postgres"
+            DATABASE_URL: "postgresql://raguser:changeMeRag123!@agentragio-postgres:5432/rag_db"
+            POSTGRES_SERVER: "agentragio-postgres"
             POSTGRES_PORT: "5432"
             POSTGRES_DB: "rag_db"
             POSTGRES_USER: "raguser"
             POSTGRES_PASSWORD: "changeMeRag123!"
-            CHROMA_HOST: "rag-multi-expert-chroma"
+            CHROMA_HOST: "agentragio-chroma"
             CHROMA_PORT: "8001"
             SECRET_KEY: "changeMeSecretKeyForJWT123"
             ENCRYPTION_KEY: "changeMeEncryptionKey123="
