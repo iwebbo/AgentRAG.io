@@ -113,7 +113,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: THEAI ${{ steps.version.outputs.version }}
+          name: AgentRAG.io ${{ steps.version.outputs.version }}
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: ${{ steps.version.outputs.prerelease == 'true' }}

@@ -39,13 +39,22 @@ jobs:
         echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
         echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
 
-    - name: Update Chart.yaml
+    - name: Update Chart.yaml & values.yaml
+      env:
+        VERSION: ${{ steps.version.outputs.version }}
       run: |
-        sed -i "s/version: .*/version: ${VERSION}/" charts/AgentRAG.io/Chart.yaml
-        sed -i "s/appVersion: .*/appVersion: \"${VERSION}\"/" charts/AgentRAG.io/Chart.yaml
-        sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/AgentRAG.io/Chart.yaml
-        sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/AgentRAG.io/values.yaml
-        cat charts/AgentRAG.io/Chart.yaml
+        set -euo pipefail
+        OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+        CHART=charts/AgentRAG.io
+
+        sed -i "s/^version: .*/version: ${VERSION}/" "${CHART}/Chart.yaml"
+        sed -i "s/^appVersion: .*/appVersion: \"${VERSION}\"/" "${CHART}/Chart.yaml"
+        sed -i "s|{{ github_username }}|${OWNER}|g" "${CHART}/Chart.yaml" "${CHART}/values.yaml"
+
+        yq -i '.backend.image.tag = strenv(VERSION) | .frontend.image.tag = strenv(VERSION)' "${CHART}/values.yaml"
+
+        cat "${CHART}/Chart.yaml"
+        yq '.backend.image, .frontend.image' "${CHART}/values.yaml"
 
     - name: Lint Helm chart
       run: helm lint charts/AgentRAG.io
