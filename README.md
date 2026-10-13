@@ -89,7 +89,11 @@ All the RAG.io features remain unchanged:
 ### 4. Code Review Agent in Action Pull request of Review.
 <img width="1918" height="850" alt="image" src="https://github.com/user-attachments/assets/1a7d26ea-8fa4-4bcb-af5d-36b19dc2a79b" />
 
-### 5. RAG Chat Interface (Original RAG.io)
+### 5. Scheduler - Basic Task & Agentic usage - Notification in app or email (success/failed) 
+<img width="1912" height="904" alt="image" src="https://github.com/user-attachments/assets/8466d0c5-52d1-4b2e-82bd-fbf53d7fd346" />
+<img width="1913" height="911" alt="image" src="https://github.com/user-attachments/assets/8556bc14-8981-4b6c-adf7-c8a8b4028046" />
+
+### 6. RAG Chat Interface (Original RAG.io)
 <img width="1918" height="907" alt="Capture d&#39;écran 2026-06-23 235209" src="https://github.com/user-attachments/assets/1a34d93f-a8b0-402d-98af-e5d7296feaf9" />
 
 ---
