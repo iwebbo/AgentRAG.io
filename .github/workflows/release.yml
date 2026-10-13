@@ -3,32 +3,127 @@ name: Release
 on:
   push:
     tags:
-      - 'v1.0.56'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   release:
+    name: Create GitHub Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Generate changelog
-        id: changelog
-        uses: orhun/git-cliff-action@v3
-        with:
-          config: cliff.toml
-          args: --latest --strip header
-        env:
-          OUTPUT: CHANGELOG.md
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if [[ "${VERSION}" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Create GitHub Release
+      - name: Extract changelog section
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          : > changelog_section.md
+          if [ -f CHANGELOG.md ]; then
+            awk -v v="$VERSION" '
+              /^## / {
+                if (found) exit
+                h = $0
+                sub(/^## +/, "", h)
+                gsub(/\[|\]/, "", h)
+                sub(/^[Vv]ersion +/, "", h)
+                sub(/^[vV]\.?/, "", h)
+                split(h, a, " ")
+                if (a[1] == v) { found = 1; next }
+              }
+              found { print }
+            ' CHANGELOG.md > changelog_section.md
+          fi
+          if ! grep -q '[^[:space:]]' changelog_section.md; then
+            echo "::warning::Aucune section pour la version ${VERSION} dans CHANGELOG.md"
+            echo "_No changelog entry for this version._" > changelog_section.md
+          fi
+          cat changelog_section.md
+
+      - name: Build release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          FENCE='```'
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
+          REPO_LC="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_BASE="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+
+          {
+            cat changelog_section.md
+            cat <<EOF
+
+          ---
+
+          ## Docker images
+
+          Published on GitHub Container Registry:
+
+          - Backend: [${REPO_LC}/backend](https://github.com/users/${OWNER}/packages/container/package/${REPO_LC}%2Fbackend)
+          - Frontend: [${REPO_LC}/frontend](https://github.com/users/${OWNER}/packages/container/package/${REPO_LC}%2Ffrontend)
+
+          ${FENCE}bash
+          docker pull ghcr.io/${IMAGE_BASE}/backend:latest
+          docker pull ghcr.io/${IMAGE_BASE}/frontend:latest
+
+          Guide install : https://github.com/${OWNER}/AgentRAG.io
+          ${FENCE}
+
+          ## Helm
+
+          ${FENCE}bash
+          helm repo add agentragio https://${OWNER}.github.io/AgentRAG.io/
+          helm repo update
+
+          Guide install : https://${OWNER}.github.io/AgentRAG.io/
+          ${FENCE}
+          EOF
+            if [ -n "${PREV}" ]; then
+              echo
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${PREV}...${TAG}"
+            fi
+          } > RELEASE_NOTES.md
+
+          cat RELEASE_NOTES.md
+
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ github.ref_name }}
-          body_path: CHANGELOG.md
+          name: THEAI ${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## Release ${GITHUB_REF_NAME}"
+            echo
+            echo "- Version: ${{ steps.version.outputs.version }}"
+            echo "- Pre-release: ${{ steps.version.outputs.prerelease }}"
+            echo "- ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+          } >> "$GITHUB_STEP_SUMMARY"

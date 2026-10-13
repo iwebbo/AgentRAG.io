@@ -2,7 +2,9 @@ name: Helm Chart Package & Publish
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
     paths:
       - 'charts/**'
       - 'values.yml'
@@ -33,14 +35,14 @@ jobs:
     - name: Generate version
       id: version
       run: |
-        VERSION="1.0.0"
-        echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+        VERSION="${GITHUB_REF_NAME#v}"
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
 
     - name: Update Chart.yaml
       run: |
-        sed -i "s/version: .*/version: ${{ steps.version.outputs.version }}/" charts/AgentRAG.io/Chart.yaml
-        sed -i "s/appVersion: .*/appVersion: \"${{ steps.version.outputs.version }}\"/" charts/AgentRAG.io/Chart.yaml
+        sed -i "s/version: .*/version: ${VERSION}/" charts/AgentRAG.io/Chart.yaml
+        sed -i "s/appVersion: .*/appVersion: \"${VERSION}\"/" charts/AgentRAG.io/Chart.yaml
         sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/AgentRAG.io/Chart.yaml
         sed -i "s|{{ github_username }}|${{ github.repository_owner }}|g" charts/AgentRAG.io/values.yaml
         cat charts/AgentRAG.io/Chart.yaml
@@ -72,7 +74,7 @@ jobs:
         
         ## Add Repository
         ```bash
-        helm repo add rag https://${{ github.repository_owner }}.github.io/AgentRAG.io/
+        helm repo add agentragio https://${{ github.repository_owner }}.github.io/AgentRAG.io/
         helm repo update
         ```
         
@@ -112,6 +114,16 @@ jobs:
             OPENSEARCH_USE_SSL: "true"
             OPENSEARCH_VERIFY_CERTS: "false"
             OPENSEARCH_EMBEDDING_DIM: "384"
+            # Feature/Scheduled
+            APP_BASE_URL: ""
+            SMTP_HOST: "smtp.server.com"
+            SMTP_PORT: "587"
+            SMTP_USER: "email@server.com"
+            SMTP_PASSWORD: "password/token"
+            SMTP_FROM: "emailfrom@server.com"
+            SMTP_STARTTLS: "true"
+            SMTP_USE_SSL: "false"
+            SMTP_VERIFY_CERT: "true"
 
         ```
 
