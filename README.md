@@ -76,7 +76,8 @@ All the RAG.io features remain unchanged:
 ## Demo
 
 ### 1. Agent Dashboard
-<img width="1900" height="905" alt="Capture d&#39;écran 2026-06-23 234501" src="https://github.com/user-attachments/assets/d45c7c33-6175-4c8a-834c-d5926f250396" />
+<img width="1916" height="912" alt="image" src="https://github.com/user-attachments/assets/0ca0ecbb-7be5-4872-b844-b272e2b80d15" />
+
 
 ### 2. Code Generator Agent in Action
 <img width="1904" height="904" alt="Capture d&#39;écran 2026-06-23 234040" src="https://github.com/user-attachments/assets/18a67243-55af-4b68-9215-df45af3bac36" />
@@ -94,7 +95,7 @@ All the RAG.io features remain unchanged:
 <img width="1913" height="911" alt="image" src="https://github.com/user-attachments/assets/8556bc14-8981-4b6c-adf7-c8a8b4028046" />
 
 ### 6. RAG Chat Interface (Original RAG.io)
-<img width="1918" height="907" alt="Capture d&#39;écran 2026-06-23 235209" src="https://github.com/user-attachments/assets/1a34d93f-a8b0-402d-98af-e5d7296feaf9" />
+<img width="1913" height="907" alt="image" src="https://github.com/user-attachments/assets/930a83ee-29e9-4c14-8c89-1958a04d0d12" />
 
 ---
 
