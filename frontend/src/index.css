@@ -1,0 +1,159 @@
+/* ==========================================================================
+   Design tokens — Muted Minimalist (template perso/pro, réutilisable)
+   Ce fichier est volontairement générique : copiez-le tel quel dans les
+   futures applications, seuls les composants (assets/styles/main.css) varient.
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --radius-card: 10px;
+  --radius-btn: 6px;
+
+  --sidebar-w: 56px;
+  --sidebar-w-open: 216px;
+  --topbar-h: 48px;
+}
+
+/* ---- Thème sombre (défaut) ------------------------------------------------ */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg-main: #09090b;
+  --bg-surface: #121215;
+  --bg-surface-hover: #18181c;
+  --bg-sidebar: #050507;
+
+  --border-subtle: #27272a;
+  --border-hover: #3f3f46;
+
+  --accent-primary: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-subtle: rgba(99, 102, 241, 0.12);
+  --accent-text: #ffffff;
+
+  --text-heading: #f4f4f5;
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+
+  --status-success: #10b981;
+  --status-warning: #f59e0b;
+  --status-error: #ef4444;
+  --status-info: #60a5fa;
+
+  /* Pastilles sémantiques (fond / texte / bordure) */
+  --success-bg: rgba(16, 185, 129, 0.12);  --success-fg: #6ee7b7;  --success-bd: rgba(16, 185, 129, 0.35);
+  --warning-bg: rgba(245, 158, 11, 0.12);  --warning-fg: #fcd34d;  --warning-bd: rgba(245, 158, 11, 0.35);
+  --danger-bg:  rgba(239, 68, 68, 0.12);   --danger-fg:  #fca5a5;  --danger-bd:  rgba(239, 68, 68, 0.35);
+  --accent-bg:  rgba(99, 102, 241, 0.14);  --accent-fg:  #a5b4fc;  --accent-bd:  rgba(99, 102, 241, 0.40);
+  --teal-bg:    rgba(20, 184, 166, 0.12);  --teal-fg:    #5eead4;  --teal-bd:    rgba(20, 184, 166, 0.35);
+  --info-bg:    rgba(96, 165, 250, 0.12);  --info-fg:    #93c5fd;  --info-bd:    rgba(96, 165, 250, 0.35);
+  --neutral-bg: rgba(161, 161, 170, 0.12); --neutral-fg: #a1a1aa;  --neutral-bd: rgba(161, 161, 170, 0.30);
+
+  --shadow-panel: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --overlay: rgba(0, 0, 0, 0.70);
+  --scroll-thumb: rgba(255, 255, 255, 0.12);
+
+  /* Échelle « surface → texte » (héritage : --gray-50 = fond le plus discret) */
+  --gray-50: #0c0c0f;
+  --gray-100: #18181c;
+  --gray-200: #27272a;
+  --gray-300: #3f3f46;
+  --gray-400: #71717a;
+  --gray-500: #8b8b94;
+  --gray-600: #a1a1aa;
+  --gray-700: #b4b4bb;
+  --gray-800: #d4d4d8;
+  --gray-900: #f4f4f5;
+}
+
+/* ---- Thème clair professionnel ------------------------------------------- */
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-main: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f1f5f9;
+  --bg-sidebar: #ffffff;
+
+  --border-subtle: #e2e8f0;
+  --border-hover: #cbd5e1;
+
+  --accent-primary: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-subtle: rgba(79, 70, 229, 0.10);
+  --accent-text: #ffffff;
+
+  --text-heading: #0f172a;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --status-success: #059669;
+  --status-warning: #d97706;
+  --status-error: #dc2626;
+  --status-info: #2563eb;
+
+  --success-bg: rgba(5, 150, 105, 0.10);  --success-fg: #047857;  --success-bd: rgba(5, 150, 105, 0.30);
+  --warning-bg: rgba(217, 119, 6, 0.10);  --warning-fg: #b45309;  --warning-bd: rgba(217, 119, 6, 0.30);
+  --danger-bg:  rgba(220, 38, 38, 0.08);  --danger-fg:  #b91c1c;  --danger-bd:  rgba(220, 38, 38, 0.30);
+  --accent-bg:  rgba(79, 70, 229, 0.08);  --accent-fg:  #4338ca;  --accent-bd:  rgba(79, 70, 229, 0.30);
+  --teal-bg:    rgba(13, 148, 136, 0.10); --teal-fg:    #0f766e;  --teal-bd:    rgba(13, 148, 136, 0.30);
+  --info-bg:    rgba(37, 99, 235, 0.08);  --info-fg:    #1d4ed8;  --info-bd:    rgba(37, 99, 235, 0.30);
+  --neutral-bg: rgba(100, 116, 139, 0.10);--neutral-fg: #475569;  --neutral-bd: rgba(100, 116, 139, 0.30);
+
+  --shadow-panel: 0 10px 30px -10px rgba(15, 23, 42, 0.18);
+  --shadow-subtle: 0 1px 3px 0 rgba(15, 23, 42, 0.10), 0 1px 2px 0 rgba(15, 23, 42, 0.06);
+  --overlay: rgba(15, 23, 42, 0.45);
+  --scroll-thumb: rgba(15, 23, 42, 0.18);
+
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+}
+
+/* ---- Reset ---------------------------------------------------------------- */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ---- Scrollbar épurée ----------------------------------------------------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+
+::selection { background: var(--accent-subtle); color: var(--text-heading); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

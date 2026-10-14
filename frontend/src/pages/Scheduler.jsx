@@ -265,7 +265,7 @@ const cleanParams = (obj) => {
 };
 
 const overlayStyle = {
-  position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex',
+  position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex',
   alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)',
 };
 

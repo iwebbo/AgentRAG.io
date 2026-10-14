@@ -485,8 +485,8 @@ echo "TOKEN=$TOKEN"`;
                   padding: 'var(--spacing-3)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)',
                   background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)'
                 }}>
-                  <ShieldAlert size={18} style={{ color: '#b45309', flexShrink: 0, marginTop: '2px' }} />
-                  <span style={{ fontSize: 'var(--text-sm)', color: '#92400e' }}>
+                  <ShieldAlert size={18} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: '2px' }} />
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--warning-fg)' }}>
                     Treat this token like a password. It grants full API access as <strong>{user?.username}</strong>.
                     Expiry is set by the backend (<code>ACCESS_TOKEN_EXPIRE_MINUTES</code> / <code>REFRESH_TOKEN_EXPIRE_DAYS</code>) —
                     the exact dates below are read directly from the generated token once you create one. Never commit it to a repo or CI logs.

@@ -29,9 +29,9 @@ const ProjectIcon = ({ name }) => {
 // ── Vector store badge ────────────────────────────────────────────────────────
 const VsBadge = ({ type }) => {
   const cfg = {
-    chroma:     { label: 'ChromaDB',    bg: '#EEEDFE', color: '#3C3489', border: '#AFA9EC' },
-    opensearch: { label: 'OpenSearch',  bg: '#FAEEDA', color: '#633806', border: '#EF9F27' },
-    both:       { label: 'Chroma + OS', bg: '#EAF3DE', color: '#27500A', border: '#97C459' },
+    chroma:     { label: 'ChromaDB',    bg: 'var(--accent-bg)', color: 'var(--accent-fg)', border: 'var(--accent-bd)' },
+    opensearch: { label: 'OpenSearch',  bg: 'var(--warning-bg)', color: 'var(--warning-fg)', border: 'var(--warning-bd)' },
+    both:       { label: 'Chroma + OS', bg: 'var(--success-bg)', color: 'var(--success-fg)', border: 'var(--success-bd)' },
   };
   const c = cfg[type] || cfg.chroma;
   return (
@@ -56,9 +56,9 @@ const IntBadge = ({ integration }) => {
       display: 'inline-flex', alignItems: 'center', gap: '4px',
       padding: '3px 8px', borderRadius: '20px',
       fontSize: '11px', fontWeight: '500',
-      background: isGit ? '#FAEEDA' : '#EAF3DE',
-      color: isGit ? '#633806' : '#27500A',
-      border: `0.5px solid ${isGit ? '#EF9F27' : '#97C459'}`,
+      background: isGit ? 'var(--warning-bg)' : 'var(--success-bg)',
+      color: isGit ? 'var(--warning-fg)' : 'var(--success-fg)',
+      border: `0.5px solid ${isGit ? 'var(--warning-bd)' : 'var(--success-bd)'}`,
     }}>
       {isGit ? <GitBranch size={10} /> : <Folder size={10} />}
       {integration.name}
@@ -310,8 +310,7 @@ const Projects = () => {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '9px 18px',
-              background: 'transparent',
-              color: 'white',
+              background: 'var(--accent-primary)', color: '#fff',
               border: 'none',
               borderRadius: 'var(--radius)',
               fontSize: 'var(--text-sm)',
@@ -353,7 +352,7 @@ const Projects = () => {
               onClick={() => setShowModal(true)}
               style={{
                 padding: '8px 20px',
-                background: 'var(--gray-900)', color: 'white',
+                background: 'var(--accent-primary)', color: '#fff',
                 border: 'none', borderRadius: 'var(--radius)',
                 fontSize: 'var(--text-sm)', fontWeight: '500', cursor: 'pointer',
               }}
@@ -530,7 +529,7 @@ const Projects = () => {
         {showModal && (
           <div style={{
             position: 'fixed', inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.4)',
+            backgroundColor: 'var(--overlay)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000, padding: 'var(--spacing-4)', overflowY: 'auto',
           }}>

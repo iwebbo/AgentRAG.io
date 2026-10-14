@@ -1,17 +1,18 @@
-//import Header from './Header';
 import Sidebar from './Sidebar';
+import Topbar from './Topbar';
 
-const Layout = ({ children, showSidebar = true }) => {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <div style={{ display: 'flex', flex: 1 }}>
-        {showSidebar && <Sidebar />}
-        <main style={{ flex: 1, overflow: 'auto' }}>
-          {children}
-        </main>
+const Layout = ({ children, showSidebar = true }) => (
+  <div className="app-layout">
+    {showSidebar && (
+      <div className="sidebar-rail">
+        <Sidebar />
       </div>
+    )}
+    <div className="main-content">
+      <Topbar />
+      <main className="main-scroll">{children}</main>
     </div>
-  );
-};
+  </div>
+);
 
 export default Layout;

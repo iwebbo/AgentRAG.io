@@ -1,20 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, Plus, Trash2, ArrowLeft, Settings as SettingsIcon, Zap, Copy, Check, RotateCcw, Download } from 'lucide-react';
+import { Send, Loader2, Plus, Trash2, ArrowLeft, Settings as SettingsIcon, Zap, Copy, Check, RotateCcw, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { User, Bot } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Loading from '../components/common/Loading';
 import Button from '../components/common/Button';
-import MarkdownMessage from '../components/common/MarkdownMessage';
+import MessageItem from '../components/chat/MessageItem';
 import api from '../services/api';
 import ExportButton from '../components/common/ExportButton';
 import ExportHistory from '../components/common/ExportHistory';
+
+const SUGGESTIONS = [
+  { title: 'Summarize documents', hint: 'Key points of the project corpus', prompt: 'Summarize the main topics covered by the documents, with the source of each point.' },
+  { title: 'Find an answer', hint: 'Grounded in your documents only', prompt: 'Using only the documents, answer the following question and cite the sources:\n\n' },
+  { title: 'Compare', hint: 'Differences between documents or versions', prompt: 'Compare the following elements across the documents and list the differences:\n\n' },
+  { title: 'Extract', hint: 'Dates, figures, names, requirements', prompt: 'Extract all the dates, figures and requirements related to the following topic, as a table with sources:\n\n' },
+];
 
 const RAGChat = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const stickRef = useRef(true);
+  const [promptExpanded, setPromptExpanded] = useState(false);
 
   // FIX: Use a ref to always hold the latest conversationId — avoids stale closure in async stream handler
   const currentConversationIdRef = useRef(null);
@@ -56,8 +65,13 @@ const RAGChat = () => {
   }, [projectId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (stickRef.current) messagesEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages]);
+
+  const handleMessagesScroll = (e) => {
+    const el = e.currentTarget;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
 
   useEffect(() => {
     if (chatSettings.provider_name) {
@@ -214,6 +228,20 @@ const RAGChat = () => {
 
     setStreaming(true);
     setRetrievedChunks([]);
+    stickRef.current = true;
+
+    // Les tokens arrivent plus vite que 60 fps : on ne publie qu'une fois par frame
+    const live = { text: '', raf: null };
+    const flushLive = () => {
+      if (live.raf !== null) { cancelAnimationFrame(live.raf); live.raf = null; }
+      if (!live.text) return;
+      const text = live.text;
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...updated[updated.length - 1], content: text };
+        return updated;
+      });
+    };
 
     try {
       const response = await fetch(`/api/rag/chat/stream`, {
@@ -269,14 +297,8 @@ const RAGChat = () => {
 
           } else if (eventType === 'message') {
             fullResponse += data.content;
-            setMessages(prev => {
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                ...updated[updated.length - 1],
-                content: fullResponse
-              };
-              return updated;
-            });
+            live.text = fullResponse;
+            if (live.raf === null) live.raf = requestAnimationFrame(() => { live.raf = null; flushLive(); });
 
           } else if (eventType === 'done') {
             if (data.conversation_id && currentConversationIdRef.current === null) {
@@ -319,6 +341,8 @@ const RAGChat = () => {
       if (buffer.trim()) await parseSSEBlock(buffer.trim());
     } catch (error) {
       console.error('Streaming error:', error);
+      if (live.raf !== null) { cancelAnimationFrame(live.raf); live.raf = null; }
+      live.text = '';
       // Remove empty placeholder on error
       setMessages(prev => {
         const updated = [...prev];
@@ -327,6 +351,7 @@ const RAGChat = () => {
       });
       alert('Failed to send message: ' + error.message);
     } finally {
+      flushLive(); // dernier chunk jamais perdu
       setStreaming(false);
     }
   };
@@ -349,6 +374,14 @@ const RAGChat = () => {
     }
   }, [input]);
 
+  const retryRef = useRef(null);
+  retryRef.current = handleRetryMessage;
+  const onRetry = useCallback((message, index) => retryRef.current(message, index), []);
+
+  useEffect(() => {
+    if (textareaRef.current && input) autoResizeTextarea(textareaRef.current);
+  }, [promptExpanded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) {
     return (
       <Layout>
@@ -359,7 +392,7 @@ const RAGChat = () => {
 
   return (
     <Layout>
-      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 73px)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - var(--topbar-h))' }}>
         <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
           <aside style={{
             width: '280px',
@@ -459,7 +492,7 @@ const RAGChat = () => {
           </aside>
 
           <div className="chat-container">
-            <div className="chat-messages">
+            <div className="chat-messages" onScroll={handleMessagesScroll}>
               {messages.length === 0 ? (
                 <div style={{
                   display: 'flex',
@@ -492,103 +525,49 @@ const RAGChat = () => {
                       128K Context Active
                     </div>
                   )}
+                  <div className="suggest-grid">
+                    {SUGGESTIONS.map((sg) => (
+                      <button
+                        key={sg.title}
+                        type="button"
+                        className="suggest-card"
+                        onClick={() => {
+                          setInput(sg.prompt);
+                          requestAnimationFrame(() => {
+                            const t = textareaRef.current;
+                            if (t) { t.focus(); autoResizeTextarea(t); t.setSelectionRange(t.value.length, t.value.length); }
+                          });
+                        }}
+                      >
+                        <strong>{sg.title}</strong>
+                        <span>{sg.hint}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <>
-                  {messages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`chat-message ${message.role === 'user' ? 'chat-message-user' : ''}`}
-                      style={{ marginBottom: 'var(--spacing-4)' }}
-                    >
-                      <div className="chat-message-avatar">
-                        {message.role === 'user' ? <User size={20} /> : <Bot size={20} />}
-                      </div>
-                      <div
-                        className="chat-message-content"
-                        style={{ position: 'relative' }}
-                        onMouseEnter={(e) => {
-                          const actions = e.currentTarget.querySelector('.message-actions');
-                          if (actions) actions.style.opacity = '1';
-                        }}
-                        onMouseLeave={(e) => {
-                          const actions = e.currentTarget.querySelector('.message-actions');
-                          if (actions) actions.style.opacity = '0';
-                        }}
-                      >
-                        {message.content ? (
-                          <MarkdownMessage
-                            content={message.content}
-                            isStreaming={streaming && index === messages.length - 1}
-                          />
-                        ) : (
-                          <Loader2 className="animate-spin" size={20} style={{ color: 'var(--gray-500)' }} />
-                        )}
-                        {message.content && !(streaming && index === messages.length - 1) && (
-                          <div
-                            className="message-actions"
-                            style={{
-                              display: 'flex',
-                              gap: '4px',
-                              marginTop: '6px',
-                              opacity: 0,
-                              transition: 'opacity 0.15s ease',
-                            }}
-                          >
-                            <button
-                              onClick={() => handleCopyMessage(message.content, index)}
-                              title="Copy"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px',
-                                fontSize: 'var(--text-xs)',
-                                color: copiedIndex === index ? '#22c55e' : 'var(--gray-500)',
-                                background: 'var(--gray-100)',
-                                border: '1px solid var(--gray-200)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                transition: 'color 0.15s ease',
-                              }}
-                            >
-                              {copiedIndex === index ? <Check size={12} /> : <Copy size={12} />}
-                              {copiedIndex === index ? 'Copied' : 'Copy'}
-                            </button>
-                            <button
-                              onClick={() => handleRetryMessage(message, index)}
-                              disabled={streaming}
-                              title={message.role === 'user' ? 'Retry this message' : 'Regenerate response'}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px',
-                                fontSize: 'var(--text-xs)',
-                                color: 'var(--gray-500)',
-                                background: 'var(--gray-100)',
-                                border: '1px solid var(--gray-200)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: streaming ? 'not-allowed' : 'pointer',
-                                opacity: streaming ? 0.4 : 1,
-                                transition: 'opacity 0.15s ease',
-                              }}
-                            >
-                              <RotateCcw size={12} />
-                              {message.role === 'user' ? 'Retry' : 'Regenerate'}
-                            </button>
-                              {message.role === 'assistant' && message.content && (
-                                <ExportButton
-                                  content={message.content}
-                                  title={message.content.trim().split(/\s+/).slice(0, 6).join(' ')}
-                                  compact={false}
-                                />
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  {messages.map((message, index) => {
+                    const isLast = index === messages.length - 1;
+                    return (
+                      <MessageItem
+                        key={index}
+                        message={message}
+                        index={index}
+                        grouped={false}
+                        isStreaming={streaming && isLast}
+                        busy={streaming}
+                        onRetry={onRetry}
+                        thinkingLabel={
+                          isLast && streaming
+                            ? (retrievedChunks.length
+                                ? `Analyzing ${retrievedChunks.length} source${retrievedChunks.length !== 1 ? 's' : ''}`
+                                : 'Searching documents')
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </>
               )}
@@ -745,7 +724,7 @@ const RAGChat = () => {
                         <div key={idx} style={{
                           padding: 'var(--spacing-2)',
                           marginBottom: 'var(--spacing-2)',
-                          backgroundColor: 'white',
+                          backgroundColor: 'var(--bg-surface)',
                           borderRadius: 'var(--radius)',
                           border: '1px solid var(--gray-200)'
                         }}>
@@ -761,6 +740,15 @@ const RAGChat = () => {
                   )}
 
                   <div style={{ position: 'relative', padding: 'var(--spacing-3) var(--spacing-4)' }}>
+                    <button
+                      type="button"
+                      className="prompt-expand"
+                      onClick={() => setPromptExpanded((v) => !v)}
+                      title={promptExpanded ? 'Reduce' : 'Expand'}
+                      aria-label={promptExpanded ? 'Reduce prompt box' : 'Expand prompt box'}
+                    >
+                      {promptExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    </button>
                     <textarea
                       ref={textareaRef}
                       placeholder="Ask a question about your documents..."
@@ -770,7 +758,6 @@ const RAGChat = () => {
                         autoResizeTextarea(e.target);
                       }}
                       onKeyDown={handleKeyDown}
-                      disabled={streaming}
                       style={{
                         border: 'none',
                         outline: 'none',
@@ -778,13 +765,13 @@ const RAGChat = () => {
                         resize: 'none',
                         fontSize: 'var(--text-base)',
                         lineHeight: '1.5',
-                        minHeight: '24px',
-                        maxHeight: '200px',
+                        minHeight: promptExpanded ? '160px' : '52px',
+                        maxHeight: promptExpanded ? '60vh' : '220px',
                         width: '100%',
-                        padding: 0,
+                        padding: '0 28px 0 0',
                         margin: 0,
                       }}
-                      rows={1}
+                      rows={promptExpanded ? 6 : 2}
                     />
 
                     <button
@@ -802,7 +789,7 @@ const RAGChat = () => {
                     color: 'var(--gray-500)',
                     textAlign: 'center',
                   }}>
-                    {streaming ? 'AgentRAG is thinking...' : 'Press Enter to send - Shift+Enter for new line'}
+                    {streaming ? 'Generating… you can already type your next question' : 'Press Enter to send - Shift+Enter for new line'}
                   </div>
                 </div>
               </div>

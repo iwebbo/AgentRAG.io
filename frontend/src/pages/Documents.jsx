@@ -16,26 +16,26 @@ import api from '../services/api';
 
 // ── File type config ──────────────────────────────────────────────────────────
 const FILE_TYPE_CONFIG = {
-  pdf:        { label: 'PDF',      bg: '#FCEBEB', color: '#791F1F' },
-  txt:        { label: 'TXT',      bg: '#E6F1FB', color: '#0C447C' },
-  md:         { label: 'MD',       bg: '#E6F1FB', color: '#0C447C' },
-  markdown:   { label: 'MD',       bg: '#E6F1FB', color: '#0C447C' },
-  docx:       { label: 'DOC',      bg: '#EEEDFE', color: '#3C3489' },
-  doc:        { label: 'DOC',      bg: '#EEEDFE', color: '#3C3489' },
-  xlsx:       { label: 'XLS',      bg: '#EAF3DE', color: '#27500A' },
-  xls:        { label: 'XLS',      bg: '#EAF3DE', color: '#27500A' },
-  csv:        { label: 'CSV',      bg: '#EAF3DE', color: '#27500A' },
-  pptx:       { label: 'PPT',      bg: '#FAEEDA', color: '#633806' },
-  ppt:        { label: 'PPT',      bg: '#FAEEDA', color: '#633806' },
-  html:       { label: 'HTML',     bg: '#FAEEDA', color: '#633806' },
-  py:         { label: 'PY',       bg: '#E1F5EE', color: '#085041' },
-  js:         { label: 'JS',       bg: '#E1F5EE', color: '#085041' },
-  jsx:        { label: 'JSX',      bg: '#E1F5EE', color: '#085041' },
-  ts:         { label: 'TS',       bg: '#E1F5EE', color: '#085041' },
-  tsx:        { label: 'TSX',      bg: '#E1F5EE', color: '#085041' },
-  json:       { label: 'JSON',     bg: '#E1F5EE', color: '#085041' },
-  yaml:       { label: 'YAML',     bg: '#E1F5EE', color: '#085041' },
-  yml:        { label: 'YAML',     bg: '#E1F5EE', color: '#085041' },
+  pdf:        { label: 'PDF',      bg: 'var(--danger-bg)', color: 'var(--danger-fg)' },
+  txt:        { label: 'TXT',      bg: 'var(--info-bg)', color: 'var(--info-fg)' },
+  md:         { label: 'MD',       bg: 'var(--info-bg)', color: 'var(--info-fg)' },
+  markdown:   { label: 'MD',       bg: 'var(--info-bg)', color: 'var(--info-fg)' },
+  docx:       { label: 'DOC',      bg: 'var(--accent-bg)', color: 'var(--accent-fg)' },
+  doc:        { label: 'DOC',      bg: 'var(--accent-bg)', color: 'var(--accent-fg)' },
+  xlsx:       { label: 'XLS',      bg: 'var(--success-bg)', color: 'var(--success-fg)' },
+  xls:        { label: 'XLS',      bg: 'var(--success-bg)', color: 'var(--success-fg)' },
+  csv:        { label: 'CSV',      bg: 'var(--success-bg)', color: 'var(--success-fg)' },
+  pptx:       { label: 'PPT',      bg: 'var(--warning-bg)', color: 'var(--warning-fg)' },
+  ppt:        { label: 'PPT',      bg: 'var(--warning-bg)', color: 'var(--warning-fg)' },
+  html:       { label: 'HTML',     bg: 'var(--warning-bg)', color: 'var(--warning-fg)' },
+  py:         { label: 'PY',       bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
+  js:         { label: 'JS',       bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
+  jsx:        { label: 'JSX',      bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
+  ts:         { label: 'TS',       bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
+  tsx:        { label: 'TSX',      bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
+  json:       { label: 'JSON',     bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
+  yaml:       { label: 'YAML',     bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
+  yml:        { label: 'YAML',     bg: 'var(--teal-bg)', color: 'var(--teal-fg)' },
 };
 
 const FILE_TYPE_LABELS = {
@@ -69,7 +69,7 @@ const getFileExt = (filename, fileType) => {
 
 const FileTypeIcon = ({ filename, fileType }) => {
   const ext = getFileExt(filename, fileType);
-  const cfg = FILE_TYPE_CONFIG[ext] || { label: 'FILE', bg: '#F1EFE8', color: '#5F5E5A' };
+  const cfg = FILE_TYPE_CONFIG[ext] || { label: 'FILE', bg: 'var(--neutral-bg)', color: 'var(--neutral-fg)' };
   return (
     <div style={{
       width: '28px', height: '28px', flexShrink: 0,
@@ -87,20 +87,20 @@ const FileTypeIcon = ({ filename, fileType }) => {
 const StatusBadge = ({ status }) => {
   const cfg = {
     completed: {
-      bg: '#EAF3DE', color: '#27500A', border: '#97C459',
+      bg: 'var(--success-bg)', color: 'var(--success-fg)', border: 'var(--success-bd)',
       icon: <Check size={8} strokeWidth={2.5} />, label: 'Indexed',
     },
     processing: {
-      bg: '#FAEEDA', color: '#633806', border: '#EF9F27',
-      icon: <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EF9F27', display: 'inline-block', animation: 'pulse 1.2s ease-in-out infinite' }} />,
+      bg: 'var(--warning-bg)', color: 'var(--warning-fg)', border: 'var(--warning-bd)',
+      icon: <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--warning-bd)', display: 'inline-block', animation: 'pulse 1.2s ease-in-out infinite' }} />,
       label: 'Processing',
     },
     failed: {
-      bg: '#FCEBEB', color: '#791F1F', border: '#F09595',
+      bg: 'var(--danger-bg)', color: 'var(--danger-fg)', border: 'var(--danger-bd)',
       icon: <X size={8} strokeWidth={2.5} />, label: 'Failed',
     },
     pending: {
-      bg: '#FAEEDA', color: '#633806', border: '#EF9F27',
+      bg: 'var(--warning-bg)', color: 'var(--warning-fg)', border: 'var(--warning-bd)',
       icon: <Loader2 size={8} style={{ animation: 'spin 1s linear infinite' }} />,
       label: 'Pending',
     },
@@ -123,10 +123,10 @@ const StatusBadge = ({ status }) => {
 const SourceBadge = ({ source }) => {
   if (!source || source === 'upload') return null;
   const cfg = {
-    git:    { bg: '#FAEEDA', color: '#633806', border: '#EF9F27', icon: <GitBranch size={9} />, label: 'Git' },
-    gdrive: { bg: '#EAF3DE', color: '#27500A', border: '#97C459', icon: <Folder size={9} />,    label: 'Drive' },
+    git:    { bg: 'var(--warning-bg)', color: 'var(--warning-fg)', border: 'var(--warning-bd)', icon: <GitBranch size={9} />, label: 'Git' },
+    gdrive: { bg: 'var(--success-bg)', color: 'var(--success-fg)', border: 'var(--success-bd)', icon: <Folder size={9} />,    label: 'Drive' },
   };
-  const c = cfg[source] || { bg: '#E6F1FB', color: '#0C447C', border: '#85B7EB', icon: <ExternalLink size={9} />, label: source };
+  const c = cfg[source] || { bg: 'var(--info-bg)', color: 'var(--info-fg)', border: 'var(--info-bd)', icon: <ExternalLink size={9} />, label: source };
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '3px',
@@ -154,12 +154,12 @@ const SourceChip = ({ source, syncing, onSync, onDelete }) => {
     }}>
       <div style={{
         width: '18px', height: '18px', borderRadius: '4px',
-        background: isGit ? '#FAEEDA' : '#EAF3DE',
+        background: isGit ? 'var(--warning-bg)' : 'var(--success-bg)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
         {isGit
-          ? <GitBranch size={10} color="#633806" />
-          : <Folder size={10} color="#27500A" />
+          ? <GitBranch size={10} style={{ color: 'var(--warning-fg)' }} />
+          : <Folder size={10} style={{ color: 'var(--success-fg)' }} />
         }
       </div>
       <span style={{ fontWeight: '500', color: 'var(--gray-800)' }}>{source.name}</span>
@@ -460,7 +460,7 @@ const Documents = () => {
                   display: 'inline-flex', alignItems: 'center', gap: '5px',
                   height: '32px', padding: '0 14px',
                   borderRadius: 'var(--radius)',
-                  background: 'var(--gray-900)', color: 'white',
+                  background: 'var(--accent-primary)', color: '#fff',
                   border: 'none',
                   fontSize: '12px', fontWeight: '500',
                   cursor: 'pointer',
@@ -531,7 +531,7 @@ const Documents = () => {
             {projectId && <label style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '8px 20px',
-              background: 'var(--gray-900)', color: 'white',
+              background: 'var(--accent-primary)', color: '#fff',
               border: 'none', borderRadius: 'var(--radius)',
               fontSize: 'var(--text-sm)', fontWeight: '500', cursor: 'pointer',
             }}>

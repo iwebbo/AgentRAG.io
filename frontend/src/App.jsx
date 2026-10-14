@@ -10,14 +10,14 @@ import Templates from './pages/Templates';
 import Projects from './pages/Projects';
 import Agents from './pages/Agents';
 import Scheduler from './pages/Scheduler';
-import RAGChat from './pages/RAGChat'; 
+import RAGChat from './pages/RAGChat';
 import Documents from './pages/Documents';
 import Loading from './components/common/Loading';
 import './assets/styles/main.css';
 
 const PrivateRoute = ({ children }) => {
   const { user } = useAuthStore();
-  return user ? children : <Navigate to="/login" />;
+  return user ? children : <Navigate to="/login" replace />;
 };
 
 function App() {
@@ -60,8 +60,7 @@ function App() {
           }
         />
         <Route
-          path="/projects/:projectId/chat"  // ← AJOUTER
-          element={
+          path="/projects/:projectId/chat"          element={
             <PrivateRoute>
               <RAGChat />
             </PrivateRoute>

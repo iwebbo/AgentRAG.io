@@ -28,24 +28,12 @@ const UploadButton = ({ projectId, onMessage, onSettled }) => {
 
   return (
     <label
-      style={{
-        flex: 1,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        gap: '5px', height: '32px',
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--gray-200)',
-        background: 'transparent',
-        color: busy ? 'var(--primary)' : 'var(--gray-600)',
-        fontSize: '12px', fontWeight: '500',
-        cursor: 'pointer', transition: 'all 0.12s',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-50)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      className="btn btn-ghost btn-sm"
+      style={{ flex: 1, height: 32, cursor: 'pointer', color: busy ? 'var(--accent-fg)' : undefined }}
     >
       {busy
         ? <><Loader2 size={13} className="animate-spin" /> {active} in progress</>
-        : <><Upload size={13} /> Upload</>
-      }
+        : <><Upload size={13} /> Upload</>}
       <input type="file" multiple hidden accept={ACCEPT} onChange={handleChange} />
     </label>
   );

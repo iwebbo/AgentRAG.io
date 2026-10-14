@@ -38,10 +38,10 @@ const isLocal = (provider) =>
 
 const Badge = ({ children, variant = 'default' }) => {
   const styles = {
-    active:   { background: '#EAF3DE', color: '#27500A', border: '0.5px solid #97C459' },
-    inactive: { background: '#F1EFE8', color: '#5F5E5A', border: '0.5px solid #B4B2A9' },
-    key:      { background: '#EEEDFE', color: '#3C3489', border: '0.5px solid #AFA9EC' },
-    local:    { background: '#E1F5EE', color: '#085041', border: '0.5px solid #5DCAA5' },
+    active:   { background: 'var(--success-bg)', color: 'var(--success-fg)', border: '0.5px solid var(--success-bd)' },
+    inactive: { background: 'var(--neutral-bg)', color: 'var(--neutral-fg)', border: '0.5px solid var(--neutral-bd)' },
+    key:      { background: 'var(--accent-bg)', color: 'var(--accent-fg)', border: '0.5px solid var(--accent-bd)' },
+    local:    { background: 'var(--teal-bg)', color: 'var(--teal-fg)', border: '0.5px solid var(--teal-bd)' },
     default:  { background: 'var(--gray-100)', color: 'var(--gray-600)', border: '0.5px solid var(--gray-200)' },
   };
   return (
@@ -65,7 +65,7 @@ const Toggle = ({ checked, onChange, disabled }) => (
     style={{
       width: '32px', height: '18px',
       borderRadius: '9px',
-      background: checked ? '#639922' : 'var(--gray-300)',
+      background: checked ? 'var(--status-success)' : 'var(--gray-300)',
       border: 'none',
       position: 'relative',
       cursor: disabled ? 'not-allowed' : 'pointer',
@@ -183,7 +183,7 @@ const ProviderCard = ({ provider, onDelete, onTest, onToggle, testing }) => {
         <Badge variant={active ? 'active' : 'inactive'}>
           <span style={{
             width: '5px', height: '5px', borderRadius: '50%',
-            background: active ? '#639922' : '#B4B2A9',
+            background: active ? 'var(--status-success)' : 'var(--neutral-bd)',
             flexShrink: 0,
           }} />
           {active ? 'Active' : 'Inactive'}
@@ -382,7 +382,7 @@ const Providers = () => {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '9px 18px',
-              background: 'transparent', color: 'white',
+              background: 'var(--accent-primary)', color: '#fff',
               border: 'none', borderRadius: 'var(--radius)',
               fontSize: 'var(--text-sm)', fontWeight: '500',
               cursor: 'pointer', transition: 'opacity 0.15s',
@@ -421,7 +421,7 @@ const Providers = () => {
               onClick={() => setShowModal(true)}
               style={{
                 padding: '8px 20px',
-                background: 'var(--gray-900)', color: 'white',
+                background: 'var(--accent-primary)', color: '#fff',
                 border: 'none', borderRadius: 'var(--radius)',
                 fontSize: 'var(--text-sm)', fontWeight: '500', cursor: 'pointer',
               }}
@@ -497,7 +497,7 @@ const Providers = () => {
         {showModal && (
           <div style={{
             position: 'fixed', inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.4)',
+            backgroundColor: 'var(--overlay)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000, padding: 'var(--spacing-4)',
           }}>
@@ -614,7 +614,7 @@ const Providers = () => {
                     style={{
                       width: '36px', height: '20px',
                       borderRadius: '10px',
-                      background: formData.is_active ? '#639922' : 'var(--gray-300)',
+                      background: formData.is_active ? 'var(--status-success)' : 'var(--gray-300)',
                       border: 'none', padding: 0,
                       position: 'relative', cursor: 'pointer',
                       transition: 'background 0.15s',

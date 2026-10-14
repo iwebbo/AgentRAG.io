@@ -46,7 +46,7 @@ const MetricCard = ({ value, label, delta }) => (
       {label}
     </div>
     {delta && (
-      <div style={{ fontSize: '11px', color: '#27500A', marginTop: '2px' }}>
+      <div style={{ fontSize: '11px', color: 'var(--success-fg)', marginTop: '2px' }}>
         {delta}
       </div>
     )}
@@ -60,8 +60,8 @@ const ProviderRow = ({ provider }) => {
     (provider.base_url || '').includes('127.0.0.1');
 
   const labelCfg = isLocal
-    ? { label: 'Local', bg: '#E1F5EE', color: '#085041', border: '#5DCAA5' }
-    : { label: 'Cloud', bg: '#EEEDFE', color: '#3C3489', border: '#AFA9EC' };
+    ? { label: 'Local', bg: 'var(--teal-bg)', color: 'var(--teal-fg)', border: 'var(--teal-bd)' }
+    : { label: 'Cloud', bg: 'var(--accent-bg)', color: 'var(--accent-fg)', border: 'var(--accent-bd)' };
 
   const urlShort = (provider.base_url || '')
     .replace(/^https?:\/\//, '')
@@ -78,7 +78,7 @@ const ProviderRow = ({ provider }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
         <span style={{
           width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-          background: active ? '#639922' : '#B4B2A9',
+          background: active ? 'var(--status-success)' : 'var(--neutral-bd)',
         }} />
         <div style={{ minWidth: 0 }}>
           <div style={{

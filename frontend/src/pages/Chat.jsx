@@ -1,17 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, Plus, Trash2, MessageSquare, FileText, Mic, Settings, Copy, Check, RotateCcw, Download } from 'lucide-react';
+import { Send, Loader2, Plus, Trash2, MessageSquare, FileText, Mic, Settings, Copy, Check, RotateCcw, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { User, Bot } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Loading from '../components/common/Loading';
 import Button from '../components/common/Button';
-import MarkdownMessage from '../components/common/MarkdownMessage';
+import MessageItem from '../components/chat/MessageItem';
 import { useChatStore } from '../store/chatStore';
 import { StreamingService } from '../services/streaming';
 import api from '../services/api';
 import ExportButton from '../components/common/ExportButton';
 import ExportHistory from '../components/common/ExportHistory';
 /*add new featur for */
+
+const SUGGESTIONS = [
+  { title: 'Summarize', hint: 'Condense a text or document', prompt: 'Summarize the following text in 5 bullet points:\n\n' },
+  { title: 'Explain', hint: 'Break a concept down step by step', prompt: 'Explain the following concept simply, with an example:\n\n' },
+  { title: 'Write code', hint: 'Generate or fix a script', prompt: 'Write a script that does the following, with comments:\n\n' },
+  { title: 'Plan', hint: 'Structure a project or a task', prompt: 'Create a step-by-step plan for the following goal:\n\n' },
+];
 
 const Chat = () => {
   const textareaRef = useRef(null);
@@ -52,7 +59,8 @@ const Chat = () => {
     temperature: 0.7,
     reasoning_mode: 'standard'
   });
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const stickRef = useRef(true);
   const messagesEndRef = useRef(null);
   const streamingService = useRef(new StreamingService());
 
@@ -68,6 +76,10 @@ const Chat = () => {
       if (input.trim() && !streaming) handleSend();
     }
   };
+
+  useEffect(() => {
+    if (textareaRef.current && input) autoResizeTextarea(textareaRef.current);
+  }, [promptExpanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!input && textareaRef.current) {
@@ -158,10 +170,15 @@ const Chat = () => {
     }
   }, [currentConversation]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll : instantané, et seulement si l'utilisateur n'a pas remonté la conversation
   useEffect(() => {
-    scrollToBottom();
+    if (stickRef.current) messagesEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages]);
+
+  const handleMessagesScroll = (e) => {
+    const el = e.currentTarget;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
 
   // Load models when provider changes
   useEffect(() => {
@@ -170,9 +187,6 @@ const Chat = () => {
     }
   }, [chatSettings.provider_name]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   const loadProviders = async () => {
     try {
@@ -337,6 +351,10 @@ const Chat = () => {
     }
   };
 
+  const retryRef = useRef(null);
+  retryRef.current = handleRetryMessage;
+  const onRetry = useCallback((message, index) => retryRef.current(message, index), []);
+
   if (id && !currentConversation && loading) {
     return (
       <Layout>
@@ -347,292 +365,99 @@ const Chat = () => {
 
   return (
     <Layout>
-      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 73px)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - var(--topbar-h))' }}>
         <div style={{ 
           display: 'flex', 
           height: '100%',
           overflow: 'hidden'
         }}>
-          {/* Liste des conversations */}
-          <aside 
-            style={{ 
-              width: sidebarExpanded ? '280px' : '60px',
-              borderRight: '1px solid var(--gray-200)',
-              display: 'flex',
-              flexDirection: 'column',
-              /*backgroundColor: 'var(--bg-card)',*/
-              transition: 'width 0.3s ease',
-              overflow: 'hidden'
-            }}
-            onMouseEnter={() => setSidebarExpanded(true)}
-            onMouseLeave={() => setSidebarExpanded(false)}
-          >
-            <div style={{ 
-              padding: 'var(--spacing-4)', 
-              borderBottom: '1px solid var(--gray-200)',
-            }}>
-              <Button 
-                variant="primary" 
-                icon={Plus} 
-                onClick={handleNewChat}
-                style={{ 
-                  width: '100%',
-                  justifyContent: sidebarExpanded ? 'center' : 'center',
-                  padding: sidebarExpanded ? undefined : 'var(--spacing-2)'
-                }}
-              >
-                {sidebarExpanded && 'New Chat'}
-              </Button>
-            </div>
+          {/* Liste des conversations : rail fixe + panneau en overlay (pas de reflow du chat) */}
+          <div className="conv-rail">
+            <aside className="conv-panel">
+              <div className="conv-head">
+                <button type="button" className="btn btn-primary conv-new" onClick={handleNewChat} title="New chat">
+                  <Plus size={16} />
+                  <span className="conv-newlabel">New Chat</span>
+                </button>
+              </div>
 
-            <div 
-              className="chat-messages"
-              style={{ 
-                flex: 1, 
-                overflowY: 'auto', 
-                padding: 'var(--spacing-2)',
-                backgroundColor: 'transparent'
-            }}>
-              {conversations.length === 0 ? (
-                sidebarExpanded && (
-                  <div style={{ 
-                    padding: 'var(--spacing-8)', 
-                    textAlign: 'center',
-                    color: 'var(--gray-500)' 
-                  }}>
-                    <p style={{ fontSize: 'var(--text-sm)' }}>No conversations yet</p>
-                  </div>
-                )
-              ) : (
-                conversations.map((conv) => (
+              <div className="conv-list">
+                {conversations.map((conv) => (
                   <div
                     key={conv.id}
+                    className={`conv-item ${id === conv.id ? 'active' : ''}`}
                     onClick={() => handleSelectChat(conv.id)}
-                    style={{
-                      padding: sidebarExpanded ? 'var(--spacing-3)' : 'var(--spacing-2)',
-                      marginBottom: 'var(--spacing-2)',
-                      borderRadius: 'var(--radius)',
-                      cursor: 'pointer',
-                      backgroundColor: id === conv.id ? 'var(--gray-100)' : 'transparent',
-                      border: id === conv.id ? '1px solid var(--primary)' : '1px solid transparent',
-                      transition: 'var(--transition)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: sidebarExpanded ? 'space-between' : 'center',
-                      gap: 'var(--spacing-2)',
-                      minHeight: '40px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (id !== conv.id) {
-                        e.currentTarget.style.backgroundColor = 'var(--gray-50)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (id !== conv.id) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
-                    }}
+                    title={conv.title}
                   >
-                    {!sidebarExpanded ? (
-                      <MessageSquare size={20} style={{ color: id === conv.id ? 'var(--primary)' : 'var(--gray-600)' }} />
-                    ) : (
-                      <>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ 
-                            fontWeight: id === conv.id ? '600' : '500',
-                            fontSize: 'var(--text-sm)',
-                            color: 'var(--gray-900)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            marginBottom: 'var(--spacing-1)'
-                          }}>
-                            {conv.title}
-                          </div>
-                          <div style={{ 
-                            fontSize: 'var(--text-xs)', 
-                            color: 'var(--gray-500)',
-                            display: 'flex',
-                            gap: 'var(--spacing-2)'
-                          }}>
-                            <span>{conv.provider_name}</span>
-                            <span>{conv.message_count || 0} msg</span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteChat(conv.id);
-                          }}
-                          className="btn btn-ghost btn-sm"
-                          style={{ 
-                            padding: 'var(--spacing-1)',
-                            minWidth: 'auto',
-                            opacity: 0.6
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = 1;
-                            e.currentTarget.style.color = 'var(--danger)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = 0.6;
-                            e.currentTarget.style.color = '';
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
+                    <MessageSquare size={18} />
+                    <div className="conv-meta">
+                      <div className="conv-title">{conv.title}</div>
+                      <div className="conv-sub">
+                        <span>{conv.provider_name}</span>
+                        <span>{conv.message_count || 0} msg</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="conv-del"
+                      title="Delete"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteChat(conv.id); }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
 
-            {sidebarExpanded && (
-              <div style={{ 
-                padding: 'var(--spacing-3)', 
-                borderTop: '1px solid var(--gray-200)',
-                fontSize: 'var(--text-xs)',
-                color: 'var(--gray-500)',
-                textAlign: 'center',
-                backgroundColor: 'var(--bg-card)'
-              }}>
+              <div className="conv-foot">
                 {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
               </div>
-            )}
-          </aside>
+            </aside>
+          </div>
           {/* Zone de chat principale */}
           <div className="chat-container">
             {/* Messages */}
-            <div className="chat-messages">
+            <div className="chat-messages" onScroll={handleMessagesScroll}>
               {messages.length === 0 ? (
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  height: '100%',
-                  gap: 'var(--spacing-4)'
-                }}>
-                  <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: '600', color: 'var(--gray-700)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100%', gap: 'var(--spacing-4)', padding: 'var(--spacing-4) 0' }}>
+                  <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 600, color: 'var(--text-heading)', letterSpacing: '-0.01em' }}>
                     Start a new conversation
                   </h2>
-                  <p style={{ color: 'var(--gray-600)', textAlign: 'center', maxWidth: '500px' }}>
-                    Ask me anything! I'm here to help with your questions, ideas, and tasks.
+                  <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+                    Using: <span style={{ fontFamily: 'var(--font-mono)' }}>{chatSettings.provider_name} · {chatSettings.model}</span>
                   </p>
-                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)' }}>
-                    Using: {chatSettings.provider_name} - {chatSettings.model}
-                  </p>
+                  <div className="suggest-grid">
+                    {SUGGESTIONS.map((sg) => (
+                      <button
+                        key={sg.title}
+                        type="button"
+                        className="suggest-card"
+                        onClick={() => {
+                          setInput(sg.prompt);
+                          requestAnimationFrame(() => {
+                            const t = textareaRef.current;
+                            if (t) { t.focus(); autoResizeTextarea(t); t.setSelectionRange(t.value.length, t.value.length); }
+                          });
+                        }}
+                      >
+                        <strong>{sg.title}</strong>
+                        <span>{sg.hint}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <>
                   {messages.map((message, index) => (
-                    <div
+                    <MessageItem
                       key={message.id || index}
-                      className={`
-                        chat-message 
-                        ${message.role === 'user' ? 'chat-message-user' : ''} 
-                        ${index > 0 && messages[index - 1].role === message.role ? 'chat-message-same' : ''}
-                      `}
-                      style={{ 
-                        marginBottom: index > 0 && messages[index - 1].role === message.role 
-                          ? '0.5rem' 
-                          : 'var(--spacing-4)',
-                        position: 'relative'
-                      }}
-                    >
-                      <div className="chat-message-avatar">
-                        {message.role === 'user' ? (
-                          <User size={20} />
-                        ) : (
-                          <Bot size={20} />
-                        )}
-                      </div>
-                      <div
-                        className="chat-message-content"
-                        style={{ position: 'relative' }}
-                        onMouseEnter={(e) => {
-                          const actions = e.currentTarget.querySelector('.message-actions');
-                          if (actions) actions.style.opacity = '1';
-                        }}
-                        onMouseLeave={(e) => {
-                          const actions = e.currentTarget.querySelector('.message-actions');
-                          if (actions) actions.style.opacity = '0';
-                        }}
-                      >
-                        {message.content ? (
-                          <MarkdownMessage 
-                            content={message.content} 
-                            isStreaming={streaming && index === messages.length - 1}
-                          />
-                        ) : (
-                          <Loader2 className="animate-spin" size={20} style={{ color: 'var(--gray-500)' }} />
-                        )}
-                        {/* Action buttons - appear on message hover */}
-                        {message.content && !(streaming && index === messages.length - 1) && (
-                          <div
-                            className="message-actions"
-                            style={{
-                              display: 'flex',
-                              gap: '4px',
-                              marginTop: '6px',
-                              opacity: 0,
-                              transition: 'opacity 0.15s ease',
-                            }}
-                          >
-                            <button
-                              onClick={() => handleCopyMessage(message.content, index)}
-                              title="Copy"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px',
-                                fontSize: 'var(--text-xs)',
-                                color: copiedIndex === index ? '#22c55e' : 'var(--gray-500)',
-                                background: 'var(--gray-100)',
-                                border: '1px solid var(--gray-200)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                transition: 'color 0.15s ease',
-                              }}
-                            >
-                              {copiedIndex === index ? <Check size={12} /> : <Copy size={12} />}
-                              {copiedIndex === index ? 'Copied' : 'Copy'}
-                            </button>
-                            <button
-                              onClick={() => handleRetryMessage(message, index)}
-                              disabled={streaming}
-                              title={message.role === 'user' ? 'Retry this message' : 'Regenerate response'}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px',
-                                fontSize: 'var(--text-xs)',
-                                color: 'var(--gray-500)',
-                                background: 'var(--gray-100)',
-                                border: '1px solid var(--gray-200)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: streaming ? 'not-allowed' : 'pointer',
-                                opacity: streaming ? 0.4 : 1,
-                                transition: 'opacity 0.15s ease',
-                              }}
-                            >
-                              <RotateCcw size={12} />
-                              {message.role === 'user' ? 'Retry' : 'Regenerate'}
-                            </button>
-                              {message.role === 'assistant' && message.content && (
-                              <ExportButton
-                                content={message.content}
-                                title={message.content.trim().split(/\s+/).slice(0, 6).join(' ')}
-                                compact={false}
-                              />
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      message={message}
+                      index={index}
+                      grouped={index > 0 && messages[index - 1].role === message.role}
+                      isStreaming={streaming && index === messages.length - 1}
+                      busy={streaming}
+                      onRetry={onRetry}
+                    />
                   ))}
                   <div ref={messagesEndRef} />
                 </>
@@ -780,6 +605,15 @@ const Chat = () => {
 
                   {/* === Zone de texte === */}
                   <div style={{ position: 'relative', padding: 'var(--spacing-3) var(--spacing-4)' }}>
+                    <button
+                      type="button"
+                      className="prompt-expand"
+                      onClick={() => setPromptExpanded((v) => !v)}
+                      title={promptExpanded ? 'Reduce' : 'Expand'}
+                      aria-label={promptExpanded ? 'Reduce prompt box' : 'Expand prompt box'}
+                    >
+                      {promptExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    </button>
                     <textarea
                       ref={textareaRef}
                       placeholder="Ask anything..."
@@ -789,7 +623,6 @@ const Chat = () => {
                         autoResizeTextarea(e.target);
                       }}
                       onKeyDown={handleKeyDown}
-                      disabled={streaming}
                       style={{
                         border: 'none',
                         outline: 'none',
@@ -797,13 +630,13 @@ const Chat = () => {
                         resize: 'none',
                         fontSize: 'var(--text-base)',
                         lineHeight: '1.5',
-                        minHeight: '24px',
-                        maxHeight: '200px',
+                        minHeight: promptExpanded ? '160px' : '52px',
+                        maxHeight: promptExpanded ? '60vh' : '220px',
                         width: '100%',
-                        padding: 0,
+                        padding: '0 28px 0 0',
                         margin: 0,
                       }}
-                      rows={1}
+                      rows={promptExpanded ? 6 : 2}
                     />
 
                     {/* Bouton Micro */}
@@ -830,7 +663,7 @@ const Chat = () => {
                       textAlign: 'center',
                     }}
                   >
-                    {streaming ? 'AgenRAT.io is thinking...' : 'Press Enter to send • Shift+Enter for new line'}
+                    {streaming ? 'Generating… you can already type your next message' : 'Press Enter to send • Shift+Enter for new line'}
                   </div>
                 </div>
               </div>
@@ -848,7 +681,7 @@ const Chat = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'var(--overlay)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

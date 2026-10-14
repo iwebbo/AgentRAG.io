@@ -1,84 +1,111 @@
 import { create } from 'zustand';
 import api from '../services/api';
 
-export const useChatStore = create((set, get) => ({
-  conversations: [],
-  currentConversation: null,
-  messages: [],
-  loading: false,
-  streaming: false,
-  error: null,
+// Les chunks SSE arrivent bien plus vite que 60 fps : on les accumule et on ne
+// publie qu'une fois par frame. Évite un re-render complet par token.
+let pending = '';
+let rafId = null;
 
-  loadConversations: async () => {
-    set({ loading: true });
-    try {
-      const response = await api.get('/api/conversations/');
-      set({ conversations: response.data, loading: false });
-    } catch (error) {
-      set({ error: error.message, loading: false });
+export const useChatStore = create((set, get) => {
+  const flush = () => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
-  },
+    if (!pending) return;
+    const chunk = pending;
+    pending = '';
+    const messages = get().messages;
+    if (!messages.length) return;
+    const last = messages[messages.length - 1];
+    // Immutable : seul le dernier message change de référence (permet React.memo sur les autres).
+    set({ messages: [...messages.slice(0, -1), { ...last, content: (last.content || '') + chunk }] });
+  };
 
-  loadConversation: async (conversationId) => {
-    set({ loading: true });
-    try {
-      const response = await api.get(`/api/conversations/${conversationId}`);
-      set({ 
-        currentConversation: response.data,
-        messages: response.data.messages || [],
-        loading: false 
-      });
-    } catch (error) {
-      set({ error: error.message, loading: false });
+  const discardPending = () => {
+    pending = '';
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
-  },
+  };
 
-  createConversation: async (data) => {
-    try {
-      const response = await api.post('/api/conversations/', data);
-      set({ currentConversation: response.data });
-      return response.data;
-    } catch (error) {
-      set({ error: error.message });
-      throw error;
-    }
-  },
+  return {
+    conversations: [],
+    currentConversation: null,
+    messages: [],
+    loading: false,
+    streaming: false,
+    error: null,
 
-  deleteConversation: async (conversationId) => {
-    try {
-      await api.delete(`/api/conversations/${conversationId}`);
-      const conversations = get().conversations.filter(c => c.id !== conversationId);
-      set({ conversations });
-      
-      if (get().currentConversation?.id === conversationId) {
-        set({ currentConversation: null, messages: [] });
+    loadConversations: async () => {
+      set({ loading: true });
+      try {
+        const response = await api.get('/api/conversations/');
+        set({ conversations: response.data, loading: false });
+      } catch (error) {
+        set({ error: error.message, loading: false });
       }
-    } catch (error) {
-      set({ error: error.message });
-      throw error;
-    }
-  },
+    },
 
-  addMessage: (message) => {
-    set({ messages: [...get().messages, message] });
-  },
+    loadConversation: async (conversationId) => {
+      set({ loading: true });
+      try {
+        const response = await api.get(`/api/conversations/${conversationId}`);
+        discardPending();
+        set({
+          currentConversation: response.data,
+          messages: response.data.messages || [],
+          loading: false,
+        });
+      } catch (error) {
+        set({ error: error.message, loading: false });
+      }
+    },
 
-  updateLastMessage: (content) => {
-    // In case debug return prompt LLM
-    //console.log('Chunk reçu :', content);
-    //console.log('updateLastMessage reçu:', content, 'Type:', typeof content);
-    const messages = [...get().messages];
-    if (messages.length > 0) {
-      messages[messages.length - 1].content += content;
-      set({ messages });
-    }
-  },
+    createConversation: async (data) => {
+      try {
+        const response = await api.post('/api/conversations/', data);
+        set({ currentConversation: response.data });
+        return response.data;
+      } catch (error) {
+        set({ error: error.message });
+        throw error;
+      }
+    },
 
-  setStreaming: (streaming) => {
-    set({ streaming });
-  },
+    deleteConversation: async (conversationId) => {
+      try {
+        await api.delete(`/api/conversations/${conversationId}`);
+        const conversations = get().conversations.filter((c) => c.id !== conversationId);
+        set({ conversations });
 
-  clearError: () => {
-    set({ error: null });
-  }
-}));
+        if (get().currentConversation?.id === conversationId) {
+          discardPending();
+          set({ currentConversation: null, messages: [] });
+        }
+      } catch (error) {
+        set({ error: error.message });
+        throw error;
+      }
+    },
+
+    addMessage: (message) => {
+      flush();
+      set({ messages: [...get().messages, message] });
+    },
+
+    updateLastMessage: (content) => {
+      if (!content) return;
+      pending += content;
+      if (rafId === null) rafId = requestAnimationFrame(() => { rafId = null; flush(); });
+    },
+
+    setStreaming: (streaming) => {
+      flush(); // ne jamais perdre le dernier chunk à la fin du stream
+      set({ streaming });
+    },
+
+    clearError: () => set({ error: null }),
+  };
+});

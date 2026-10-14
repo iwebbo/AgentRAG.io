@@ -523,11 +523,11 @@ const ExecutionHistoryPanel = ({ agent, agentType, onClose, onReopenExec }) => {
   };
 
   const statusStyle = (s) => ({
-    success: { bg: 'rgba(29,158,117,.15)', color: '#085041', dot: '#1D9E75' },
-    failed:  { bg: 'rgba(226,75,74,.12)',  color: '#791F1F', dot: '#E24B4A' },
-    running: { bg: 'rgba(96,165,250,.15)', color: '#185FA5', dot: '#60a5fa' },
-    pending: { bg: 'rgba(136,135,128,.15)', color: '#5F5E5A', dot: '#888780' },
-  }[s] || { bg: 'rgba(136,135,128,.15)', color: '#5F5E5A', dot: '#888780' });
+    success: { bg: 'rgba(29,158,117,.15)', color: 'var(--success-fg)', dot: 'var(--status-success)' },
+    failed:  { bg: 'rgba(226,75,74,.12)',  color: 'var(--danger-fg)', dot: 'var(--status-error)' },
+    running: { bg: 'rgba(96,165,250,.15)', color: 'var(--info-fg)', dot: 'var(--status-info)' },
+    pending: { bg: 'rgba(136,135,128,.15)', color: 'var(--neutral-fg)', dot: 'var(--text-muted)' },
+  }[s] || { bg: 'rgba(136,135,128,.15)', color: 'var(--neutral-fg)', dot: 'var(--text-muted)' });
 
   const getPromptLabel = (exec) => {
     const d = exec.input_data || {};
@@ -879,7 +879,7 @@ const RegisterSkillModal = ({ onClose, onSuccess, providers }) => {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
       <div className="card" style={{ width: '100%', maxWidth: '620px', maxHeight: '90vh', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-4)' }}>
           <div>
@@ -1012,7 +1012,7 @@ const AgentConfigModal = ({ agent, providers, skills, onClose, onSaved }) => {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
       <div className="card" style={{ width: '100%', maxWidth: '720px', maxHeight: '90vh', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-4)' }}>
           <div>
@@ -1540,7 +1540,7 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
   // ── IDLE : modal compacte identique à l'original ──────────────────────────
   if (phase === 'idle') {
     return (
-      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
         <div className="card" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflow: 'auto' }}>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-4)' }}>
@@ -1625,23 +1625,23 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
           {error && <Alert type="error" style={{ marginBottom: 'var(--spacing-3)', flexShrink: 0 }}>{error}</Alert>}
 
           {/* Onglets Output / History */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid #1e293b', borderRadius: 'var(--radius)', overflow: 'hidden', marginBottom: 'var(--spacing-3)' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid var(--bg-surface-hover)', borderRadius: 'var(--radius)', overflow: 'hidden', marginBottom: 'var(--spacing-3)' }}>
             {/* Tab bar */}
-            <div style={{ display: 'flex', background: '#1e293b', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+            <div style={{ display: 'flex', background: 'var(--bg-surface-hover)', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }}>
               {[
-                { key: 'output', label: 'Output', icon: <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: phase === 'running' ? '#f59e0b' : phase === 'done' ? '#22c55e' : '#ef4444', display: 'inline-block', marginRight: '6px' }} /> },
+                { key: 'output', label: 'Output', icon: <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: phase === 'running' ? '#f59e0b' : phase === 'done' ? 'var(--status-success)' : '#ef4444', display: 'inline-block', marginRight: '6px' }} /> },
                 { key: 'history', label: 'History', icon: <History size={12} style={{ marginRight: '5px', verticalAlign: '-1px' }} /> }
               ].map(tab => (
                 <button key={tab.key} onClick={() => setActiveLeftTab(tab.key)} style={{
                   padding: '6px 14px', background: 'none', border: 'none',
-                  borderBottom: activeLeftTab === tab.key ? '2px solid #60a5fa' : '2px solid transparent',
-                  color: activeLeftTab === tab.key ? '#e2e8f0' : '#64748b',
+                  borderBottom: activeLeftTab === tab.key ? '2px solid var(--info)' : '2px solid transparent',
+                  color: activeLeftTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
                   fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center',
                   fontWeight: activeLeftTab === tab.key ? '600' : '400'
                 }}>
                   {tab.icon}{tab.label}
                   {tab.key === 'history' && panelExecutions.length > 0 && (
-                    <span style={{ marginLeft: '5px', fontSize: '10px', background: '#334155', color: '#94a3b8', borderRadius: '99px', padding: '1px 5px' }}>
+                    <span style={{ marginLeft: '5px', fontSize: '10px', background: 'var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: '99px', padding: '1px 5px' }}>
                       {panelExecutions.length}
                     </span>
                   )}
@@ -1651,9 +1651,9 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
 
             {/* Output tab */}
             {activeLeftTab === 'output' && (
-              <div ref={outputRef} style={{ flex: 1, overflowY: 'auto', padding: 'var(--spacing-3)', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#0f172a', color: '#e2e8f0' }}>
-                {outputText || <span style={{ color: '#475569' }}>{phase === 'running' ? 'Waiting for output…' : 'No output captured.'}</span>}
-                {phase === 'running' && <span style={{ color: '#60a5fa', animation: 'pulse 1s infinite' }}>▋</span>}
+              <div ref={outputRef} style={{ flex: 1, overflowY: 'auto', padding: 'var(--spacing-3)', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--bg-main)', color: 'var(--text-primary)' }}>
+                {outputText || <span style={{ color: 'var(--text-muted)' }}>{phase === 'running' ? 'Waiting for output…' : 'No output captured.'}</span>}
+                {phase === 'running' && <span style={{ color: 'var(--info)', animation: 'pulse 1s infinite' }}>▋</span>}
               </div>
             )}
 
@@ -1669,8 +1669,8 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
                   <div style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--gray-500)', fontSize: 'var(--text-sm)' }}>No executions yet</div>
                 )}
                 {!panelExecLoading && panelExecutions.map((exec) => {
-                  const stMap = { success: { bg: 'rgba(29,158,117,.15)', color: '#085041', dot: '#1D9E75' }, failed: { bg: 'rgba(226,75,74,.12)', color: '#791F1F', dot: '#E24B4A' }, running: { bg: 'rgba(96,165,250,.15)', color: '#185FA5', dot: '#60a5fa' } };
-                  const st = stMap[exec.status] || { bg: 'rgba(136,135,128,.15)', color: '#5F5E5A', dot: '#888780' };
+                  const stMap = { success: { bg: 'rgba(29,158,117,.15)', color: 'var(--success-fg)', dot: 'var(--status-success)' }, failed: { bg: 'rgba(226,75,74,.12)', color: 'var(--danger-fg)', dot: 'var(--status-error)' }, running: { bg: 'rgba(96,165,250,.15)', color: 'var(--info-fg)', dot: 'var(--status-info)' } };
+                  const st = stMap[exec.status] || { bg: 'rgba(136,135,128,.15)', color: 'var(--neutral-fg)', dot: 'var(--text-muted)' };
                   const eOut = exec.output_data;
                   const convId = exec.input_data?.conversation_id
                     || (typeof eOut === 'object' && eOut !== null && (eOut.conversation_id || eOut.data?.conversation_id))
@@ -1875,7 +1875,7 @@ const HostsTab = ({ hosts, onRefresh }) => {
       )}
 
       {showAddModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 'var(--spacing-4)' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 'var(--spacing-4)' }}>
           <div className="card" style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflow: 'auto' }}>
             <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '600', marginBottom: 'var(--spacing-4)' }}>{editHost ? `Edit host — ${editHost.name}` : 'Add remote host'}</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
@@ -1978,7 +1978,7 @@ const DocumentationTab = () => (
                 <div style={{ fontSize: 'var(--text-xs)', fontWeight: '600', color: 'var(--gray-600)', marginBottom: 'var(--spacing-2)', fontFamily: 'monospace' }}>
                   {ex.filename}
                 </div>
-                <pre style={{ margin: 0, padding: 'var(--spacing-3)', background: '#0f172a', color: '#e2e8f0', borderRadius: 'var(--radius)', fontSize: '11px', lineHeight: '1.6', overflowX: 'auto', whiteSpace: 'pre' }}>
+                <pre style={{ margin: 0, padding: 'var(--spacing-3)', background: 'var(--bg-main)', color: 'var(--text-primary)', borderRadius: 'var(--radius)', fontSize: '11px', lineHeight: '1.6', overflowX: 'auto', whiteSpace: 'pre' }}>
                   <code>{ex.content}</code>
                 </pre>
               </div>
@@ -1988,7 +1988,7 @@ const DocumentationTab = () => (
                 <div style={{ fontSize: 'var(--text-xs)', fontWeight: '600', color: 'var(--gray-600)', marginBottom: 'var(--spacing-2)' }}>
                   Register via API
                 </div>
-                <pre style={{ margin: 0, padding: 'var(--spacing-3)', background: '#0f172a', color: '#86efac', borderRadius: 'var(--radius)', fontSize: '11px', lineHeight: '1.6', overflowX: 'auto', whiteSpace: 'pre' }}>
+                <pre style={{ margin: 0, padding: 'var(--spacing-3)', background: 'var(--bg-main)', color: '#86efac', borderRadius: 'var(--radius)', fontSize: '11px', lineHeight: '1.6', overflowX: 'auto', whiteSpace: 'pre' }}>
                   <code>{entry.curl}</code>
                 </pre>
               </div>
@@ -2330,7 +2330,7 @@ const Agents = () => {
         )}
 
         {showCreateModal && (
-          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
             <div className="card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'auto' }}>
               <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '600', marginBottom: 'var(--spacing-2)' }}>
                 {selectedAgentType ? `Configure — ${AGENT_TYPES[selectedAgentType].name}` : 'Select agent type'}

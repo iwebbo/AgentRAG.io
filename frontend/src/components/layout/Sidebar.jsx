@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../../store/authStore';
-import api from '../../services/api';
 import {
   LayoutDashboard, MessageSquare, Server, FileText,
-  Settings, LogOut, FolderKanban, CalendarClock
+  Settings, LogOut, FolderKanban, CalendarClock, Bot, Moon, Sun,
 } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
+import api from '../../services/api';
+import { useTheme } from '../../theme/theme';
 
 const menuItems = [
   { path: '/',          label: 'Dashboard', icon: LayoutDashboard },
   { path: '/chat',      label: 'Chat',      icon: MessageSquare   },
   { path: '/projects',  label: 'Projects',  icon: FolderKanban    },
-  { path: '/agents',    label: 'Agents',    icon: FolderKanban    },
+  { path: '/agents',    label: 'Agents',    icon: Bot             },
   { path: '/scheduler', label: 'Scheduler', icon: CalendarClock   },
   { path: '/providers', label: 'Providers', icon: Server          },
   { path: '/templates', label: 'Templates', icon: FileText        },
@@ -20,11 +21,12 @@ const menuItems = [
 
 const Sidebar = () => {
   const location = useLocation();
-  const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const { logout } = useAuthStore();
+  const { theme, toggleTheme } = useTheme();
   const [unread, setUnread] = useState(0);
 
-  // Unread notifications badge (polling, no websocket)
+  // Badge notifications non lues (polling, best-effort)
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -32,7 +34,7 @@ const Sidebar = () => {
         const res = await api.get('/api/notifications/unread-count');
         if (!cancelled) setUnread(res.data.count || 0);
       } catch (_) {
-        /* badge is best-effort */
+        /* best-effort */
       }
     };
     load();
@@ -57,16 +59,16 @@ const Sidebar = () => {
 
   return (
     <aside className="sidebar">
-
-      {/* Logo */}
       <div className="sidebar-top">
         <Link to="/" className="sidebar-logo">
-          <img src="/logo.png" alt="RAG.io" className="sidebar-logo-img" />
-          <span className="sidebar-logo-label">AgentRAG.io</span>
+          <img src="/logo.png" alt="AgentRAG.io" className="sidebar-logo-img" />
+          <span className="sidebar-logo-text">
+            <span className="sidebar-logo-label">AgentRAG.io</span>
+            <span className="sidebar-logo-sub">workspace</span>
+          </span>
         </Link>
       </div>
 
-      {/* Nav principale */}
       <nav className="sidebar-nav">
         {menuItems.map(({ path, label, icon: Icon }) => (
           <Link
@@ -74,37 +76,26 @@ const Sidebar = () => {
             to={path}
             className={`sidebar-item ${isActive(path) ? 'active' : ''}`}
             title={label}
-            style={{ position: 'relative' }}
           >
-            <Icon size={20} />
+            <Icon size={18} />
             <span className="sidebar-item-label">{label}</span>
             {path === '/scheduler' && unread > 0 && (
-              <span
-                style={{
-                  position: 'absolute', top: '4px', left: '24px', minWidth: '16px', height: '16px',
-                  padding: '0 4px', borderRadius: '99px', background: 'var(--danger-dark)', color: '#fff',
-                  fontSize: '10px', fontWeight: 700, lineHeight: '16px', textAlign: 'center',
-                }}
-              >
-                {unread > 99 ? '99+' : unread}
-              </span>
+              <span className="sidebar-badge">{unread > 99 ? '99+' : unread}</span>
             )}
           </Link>
         ))}
       </nav>
 
-      {/* Footer — Logout */}
       <div className="sidebar-footer">
-        <button
-          className="sidebar-item w-full text-left"
-          onClick={handleLogout}
-          title="Logout"
-        >
-          <LogOut size={20} />
+        <button type="button" className="sidebar-item" onClick={toggleTheme} title="Toggle theme">
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          <span className="sidebar-item-label">{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
+        </button>
+        <button type="button" className="sidebar-item danger" onClick={handleLogout} title="Logout">
+          <LogOut size={18} />
           <span className="sidebar-item-label">Logout</span>
         </button>
       </div>
-
     </aside>
   );
 };
