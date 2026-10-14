@@ -91,8 +91,8 @@ All the RAG.io features remain unchanged:
 <img width="1918" height="850" alt="image" src="https://github.com/user-attachments/assets/1a7d26ea-8fa4-4bcb-af5d-36b19dc2a79b" />
 
 ### 5. Scheduler - Basic Task & Agentic usage - Notification in app or email (success/failed) 
-<img width="1912" height="904" alt="image" src="https://github.com/user-attachments/assets/8466d0c5-52d1-4b2e-82bd-fbf53d7fd346" />
-<img width="1913" height="911" alt="image" src="https://github.com/user-attachments/assets/8556bc14-8981-4b6c-adf7-c8a8b4028046" />
+<img width="1914" height="906" alt="image" src="https://github.com/user-attachments/assets/52300f8a-c736-4558-8077-c7464d9d8b46" />
+<img width="1914" height="907" alt="image" src="https://github.com/user-attachments/assets/2c2215ec-2a4c-43c8-a2f7-146e08543f82" />
 
 ### 6. RAG Chat Interface (Original RAG.io)
 <img width="1913" height="907" alt="image" src="https://github.com/user-attachments/assets/930a83ee-29e9-4c14-8c89-1958a04d0d12" />
