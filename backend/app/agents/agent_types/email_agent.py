@@ -283,6 +283,7 @@ CONSIGNES:
 2. Ton adapté au contexte
 3. Format HTML simple
 4. Pas de signature (ajoutée automatiquement)
+5. Réponds avec le HTML brut : aucune balise ```, aucun préfixe "html", aucun texte autour
 
 Génère UNIQUEMENT le corps de l'email en HTML."""
         

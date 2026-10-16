@@ -137,28 +137,27 @@ class ClaudeProvider(BaseLLMProvider):
                 else:
                     filtered_messages.append(msg)
             
-            # Build stream parameters
             stream_params = {
                 "model": model,
                 "messages": filtered_messages,
-                "temperature": temperature,
-                "max_tokens": 4096,
-                "stream_mode": "values",  # Optionnel: pour un streaming plus précis
-                **kwargs
+                "max_tokens": kwargs.pop("max_tokens", 4096),
             }
-            
-            # Add system message if present
             if system_message:
                 stream_params["system"] = system_message
-            
-            # Stream using correct API method
+
+            extra_body = kwargs.pop("extra_body", {}) or {}
+            if temperature is not None:
+                extra_body["temperature"] = temperature
+            if extra_body:
+                stream_params["extra_body"] = extra_body
+
+            for k in ("top_p", "top_k", "stop_sequences", "metadata"):
+                if k in kwargs:
+                    stream_params[k] = kwargs[k]
+
             async with self.client.messages.stream(**stream_params) as stream:
-                async for text_block in stream.text_stream:
-                    # text_stream yields TextBlock events; extract content
-                    if hasattr(text_block, 'text'):
-                        yield text_block.text
-                    else:
-                        yield str(text_block)  # Fallback si structure changée
+                async for text in stream.text_stream:
+                    yield text
                         
         except Exception as e:
             import traceback

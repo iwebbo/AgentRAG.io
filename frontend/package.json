@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -18,12 +19,15 @@
     "lucide-react": "^0.294.0",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.4",
+    "unist-util-visit": "^5.0.0",
+    "fflate": "^0.8.2",
     "rehype-highlight": "^6.0.0",
     "react-syntax-highlighter": "^15.5.0",
     "highlight.js": "^11.10.0",
     "docx": "^8.5.0",
     "xlsx": "^0.18.5"
-
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -33,6 +37,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "vite": "^5.0.8"
+    "vite": "^5.0.8",
+    "vitest": "^1.6.0"
   }
 }

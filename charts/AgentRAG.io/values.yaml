@@ -15,7 +15,7 @@ backend:
   enabled: true
   name: backend
   image:
-    repository: ghcr.io/iwebbo/agentrag.io/backend
+    repository: ghcr.io/iwebbo/AgentRAG.io/backend
     tag: ""
     pullPolicy: IfNotPresent
   replicas: 2
@@ -63,7 +63,7 @@ frontend:
   enabled: true
   name: frontend
   image:
-    repository: ghcr.io/iwebbo/agentrag.io/frontend
+    repository: ghcr.io/iwebbo/AgentRAG.io/frontend
     tag: ""
     pullPolicy: IfNotPresent
   replicas: 2
@@ -114,7 +114,7 @@ chroma:
   name: chroma
   image:
     repository: chromadb/chroma
-    tag: ""
+    tag: "latest"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -147,15 +147,15 @@ secrets:
   name: rag-secrets
   data:
     # Database
-    DATABASE_URL: "postgresql://raguser:changeMeRag123!@agentragio-postgres:5432/rag_db"
-    POSTGRES_SERVER: "agentragio-postgres"
+    DATABASE_URL: "postgresql://raguser:changeMeRag123!@rag-multi-expert-postgres:5432/rag_db"
+    POSTGRES_SERVER: "rag-multi-expert-postgres"
     POSTGRES_PORT: "5432"
     POSTGRES_DB: "rag_db"
     POSTGRES_USER: "raguser"
     POSTGRES_PASSWORD: "changeMeRag123!"
     
     # ChromaDB
-    CHROMA_HOST: "agentragio-chroma"
+    CHROMA_HOST: "rag-multi-expert-chroma"
     CHROMA_PORT: "8001"
     
     # JWT

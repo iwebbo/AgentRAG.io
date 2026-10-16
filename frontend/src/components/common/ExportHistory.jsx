@@ -3,7 +3,10 @@
  * Usage : <ExportHistory open={show} onClose={() => setShow(false)} />
  */
 import { useState, useEffect, useCallback } from 'react';
-import { X, Download, Trash2, Globe, FileText, FileSpreadsheet, File, Clock, ChevronRight, AlertCircle } from 'lucide-react';
+import {
+  X, Download, Trash2, Globe, FileText, FileSpreadsheet, File, Clock, ChevronRight, AlertCircle,
+  FileCode, FileArchive, Hash,
+} from 'lucide-react';
 import { useExport } from '../../hooks/useExport';
 
 const FORMAT_META = {
@@ -11,7 +14,14 @@ const FORMAT_META = {
   xlsx: { icon: FileSpreadsheet, tone: 'success', label: 'Excel' },
   docx: { icon: FileText, tone: 'info', label: 'Word' },
   pdf: { icon: File, tone: 'danger', label: 'PDF' },
+  md: { icon: Hash, tone: 'accent', label: 'Markdown' },
+  zip: { icon: FileArchive, tone: 'info', label: 'ZIP' },
 };
+
+// Fichiers détectés (groovy, yaml, jenkinsfile, dockerfile, sh, tf, …) : icône code générique.
+function resolveMeta(format) {
+  return FORMAT_META[format] || { icon: FileCode, tone: 'accent', label: String(format || 'file').toUpperCase() };
+}
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -105,10 +115,12 @@ export default function ExportHistory({ open, onClose }) {
           ) : (
             <div style={{ padding: '8px 0' }}>
               {history.map((entry) => {
-                const meta = FORMAT_META[entry.format] || FORMAT_META.html;
+                const meta = resolveMeta(entry.format);
                 const Icon = meta.icon;
                 const isSelected = selected?.id === entry.id;
                 const tone = meta.tone;
+                // Pas de variante de badge « accent » : on réutilise « info ».
+                const badgeTone = tone === 'accent' ? 'info' : tone;
 
                 return (
                   <div key={entry.id}>
@@ -136,7 +148,7 @@ export default function ExportHistory({ open, onClose }) {
                           {entry.title || entry.filename}
                         </div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 3, alignItems: 'center' }}>
-                          <span className={`badge badge-${tone === 'info' ? 'info' : tone}`} style={{ fontSize: 10 }}>{meta.label}</span>
+                          <span className={`badge badge-${badgeTone}`} style={{ fontSize: 10 }}>{meta.label}</span>
                           <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Clock size={10} />
                             {formatDate(entry.createdAt)}

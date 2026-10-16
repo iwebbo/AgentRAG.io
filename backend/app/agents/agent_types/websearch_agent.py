@@ -179,7 +179,8 @@ class WebSearchAgent(BaseAgent):
             Liste de résultats avec title, url, snippet
         """
         try:
-            from duckduckgo_search import DDGS
+            # from duckduckgo_search import DDGS
+            from ddgs  import DDGS
             
             results = []
             
@@ -216,8 +217,8 @@ class WebSearchAgent(BaseAgent):
             return results
             
         except ImportError:
-            logger.error("❌ duckduckgo-search not installed")
-            logger.error("Run: pip install duckduckgo-search --break-system-packages")
+            logger.error("❌ ddgs not installed")
+            logger.error("Run: pip install ddgs  --break-system-packages")
             return []
         except Exception as e:
             logger.error(f"❌ DuckDuckGo search failed: {e}")

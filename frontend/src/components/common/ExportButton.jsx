@@ -1,24 +1,70 @@
 /**
- * ExportButton — dropdown d'export d'un message LLM (html / xlsx / docx / pdf)
+ * ExportButton — dropdown d'export d'un message LLM
+ *   · « Détecté dans ce message » : fichiers livrables extraits des blocs de code
+ *     (Jenkinsfile, .groovy, Dockerfile, values.yaml, README.md…) + ZIP — 100 % local
+ *   · Formats document : md (local) / html / xlsx / docx / pdf (backend)
  * Props : content {string}, title {string}, compact {boolean}
  */
-import { useState, useRef, useEffect } from 'react';
-import { Download, FileText, FileSpreadsheet, Globe, File, Loader2, ChevronDown, Check } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import {
+  Download, FileText, FileSpreadsheet, Globe, File, Loader2, ChevronDown, Check,
+  FileCode, FileArchive, Hash,
+} from 'lucide-react';
 import { useExport } from '../../hooks/useExport';
+import { extractFiles, exportableFiles } from '../../utils/codeBlocks';
 
 const FORMATS = [
+  { id: 'md', label: 'Markdown', description: 'Message complet (.md)', icon: Hash, tone: 'accent' },
   { id: 'html', label: 'HTML', description: 'Page web standalone', icon: Globe, tone: 'warning' },
   { id: 'xlsx', label: 'Excel', description: 'Tableur (.xlsx)', icon: FileSpreadsheet, tone: 'success' },
   { id: 'docx', label: 'Word', description: 'Document Word (.docx)', icon: FileText, tone: 'info' },
   { id: 'pdf', label: 'PDF', description: 'Document PDF', icon: File, tone: 'danger' },
 ];
 
+function MenuRow({ icon: Icon, tone, label, description, loading, done, disabled, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="menu-item"
+      style={done ? { background: `var(--${tone}-bg)` } : undefined}
+    >
+      <span
+        style={{
+          width: 30, height: 30, borderRadius: 'var(--radius-md)', flexShrink: 0,
+          background: `var(--${tone}-bg)`, border: `1px solid var(--${tone}-bd)`,
+          color: `var(--${tone}-fg)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {loading ? <Loader2 size={14} className="animate-spin" /> : done ? <Check size={14} /> : <Icon size={14} />}
+      </span>
+      <span style={{ display: 'block', minWidth: 0 }}>
+        <span
+          style={{
+            display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', lineHeight: 1.2,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          {label}
+          {done && <span style={{ color: 'var(--success-fg)', marginLeft: 6, fontWeight: 400 }}>Téléchargé !</span>}
+        </span>
+        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{description}</span>
+      </span>
+    </button>
+  );
+}
+
 export default function ExportButton({ content, title, compact = false }) {
   const [open, setOpen] = useState(false);
-  const [activeFormat, setActiveFormat] = useState(null);
+  const [activeKey, setActiveKey] = useState(null);
   const [success, setSuccess] = useState(null);
   const rootRef = useRef(null);
-  const { exportContent, exporting, exportError } = useExport();
+  const { exportContent, exportFile, exportFilesZip, exporting, exportError } = useExport();
+
+  // Parsing mémoïsé (et mis en cache par contenu dans utils/codeBlocks) : une seule fois par message terminé.
+  const files = useMemo(() => exportableFiles(extractFiles(content || '')), [content]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -29,21 +75,22 @@ export default function ExportButton({ content, title, compact = false }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const handleExport = async (format) => {
-    setActiveFormat(format);
+  const suggestedTitle = title || (content || '').trim().split(/\s+/).slice(0, 6).join(' ');
+
+  const run = async (key, task) => {
+    setActiveKey(key);
     try {
-      const suggestedTitle = title || content.trim().split(/\s+/).slice(0, 6).join(' ');
-      await exportContent(content, format, suggestedTitle);
-      setSuccess(format);
+      await task();
+      setSuccess(key);
       setTimeout(() => { setSuccess(null); setOpen(false); }, 1200);
     } catch {
       /* exportError est déjà positionné par le hook */
     } finally {
-      setActiveFormat(null);
+      setActiveKey(null);
     }
   };
 
-  const isLoading = exporting && activeFormat !== null;
+  const isLoading = exporting && activeKey !== null;
 
   return (
     <div ref={rootRef} style={{ position: 'relative', display: 'inline-block' }}>
@@ -70,6 +117,9 @@ export default function ExportButton({ content, title, compact = false }) {
         {!compact && (
           <>
             {isLoading ? 'Export...' : 'Exporter'}
+            {files.length > 0 && !isLoading && (
+              <span style={{ opacity: 0.7 }}>{`(${files.length})`}</span>
+            )}
             <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
           </>
         )}
@@ -81,46 +131,73 @@ export default function ExportButton({ content, title, compact = false }) {
             position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 200,
             background: 'var(--bg-surface)', border: '1px solid var(--border-hover)',
             borderRadius: 'var(--radius-card)', boxShadow: 'var(--shadow-panel)',
-            minWidth: 230, overflow: 'hidden', animation: 'fadeIn 0.18s ease',
+            minWidth: 250, maxWidth: 'min(360px, 90vw)', overflow: 'hidden', animation: 'fadeIn 0.18s ease',
           }}
         >
-          <div className="section-label" style={{ padding: '10px 14px 6px', borderBottom: '1px solid var(--border-subtle)' }}>
-            Choisir le format
-          </div>
+          <div style={{ maxHeight: 'min(60vh, 440px)', overflowY: 'auto' }}>
+            {files.length > 0 && (
+              <>
+                <div className="section-label" style={{ padding: '10px 14px 6px', borderBottom: '1px solid var(--border-subtle)' }}>
+                  Détecté dans ce message
+                </div>
 
-          {FORMATS.map((fmt) => {
-            const Icon = fmt.icon;
-            const isThis = activeFormat === fmt.id;
-            const isDone = success === fmt.id;
-            return (
-              <button
+                {files.map((f) => {
+                  const key = `file:${f.id}`;
+                  return (
+                    <MenuRow
+                      key={f.id}
+                      icon={FileCode}
+                      tone="accent"
+                      label={f.filename}
+                      description={`${f.lang || 'text'} · ${f.lines} ligne${f.lines > 1 ? 's' : ''}`}
+                      loading={activeKey === key}
+                      done={success === key}
+                      disabled={isLoading}
+                      onClick={() => !isLoading && run(key, () => exportFile(f))}
+                    />
+                  );
+                })}
+
+                {files.length > 1 && (
+                  <MenuRow
+                    icon={FileArchive}
+                    tone="info"
+                    label="Tout télécharger (.zip)"
+                    description={`${files.length} fichiers, arborescence conservée`}
+                    loading={activeKey === 'zip'}
+                    done={success === 'zip'}
+                    disabled={isLoading}
+                    onClick={() => !isLoading && run('zip', () => exportFilesZip(files, suggestedTitle))}
+                  />
+                )}
+              </>
+            )}
+
+            <div
+              className="section-label"
+              style={{
+                padding: '10px 14px 6px',
+                borderBottom: '1px solid var(--border-subtle)',
+                borderTop: files.length > 0 ? '1px solid var(--border-subtle)' : undefined,
+              }}
+            >
+              {files.length > 0 ? 'Formats document' : 'Choisir le format'}
+            </div>
+
+            {FORMATS.map((fmt) => (
+              <MenuRow
                 key={fmt.id}
-                type="button"
-                onClick={() => !isLoading && handleExport(fmt.id)}
+                icon={fmt.icon}
+                tone={fmt.tone}
+                label={fmt.label}
+                description={fmt.description}
+                loading={activeKey === fmt.id}
+                done={success === fmt.id}
                 disabled={isLoading}
-                className="menu-item"
-                style={isDone ? { background: `var(--${fmt.tone}-bg)` } : undefined}
-              >
-                <span
-                  style={{
-                    width: 30, height: 30, borderRadius: 'var(--radius-md)', flexShrink: 0,
-                    background: `var(--${fmt.tone}-bg)`, border: `1px solid var(--${fmt.tone}-bd)`,
-                    color: `var(--${fmt.tone}-fg)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  {isThis ? <Loader2 size={14} className="animate-spin" /> : isDone ? <Check size={14} /> : <Icon size={14} />}
-                </span>
-                <span style={{ display: 'block', minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', lineHeight: 1.2 }}>
-                    {fmt.label}
-                    {isDone && <span style={{ color: 'var(--success-fg)', marginLeft: 6, fontWeight: 400 }}>Téléchargé !</span>}
-                  </span>
-                  <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{fmt.description}</span>
-                </span>
-              </button>
-            );
-          })}
+                onClick={() => !isLoading && run(fmt.id, () => exportContent(content, fmt.id, suggestedTitle))}
+              />
+            ))}
+          </div>
 
           {exportError && (
             <div

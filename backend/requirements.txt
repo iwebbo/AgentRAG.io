@@ -1,5 +1,6 @@
 # FastAPI & Core
-fastapi==0.104.1
+#fastapi==0.104.1
+fastapi>=0.115,<1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
@@ -36,6 +37,7 @@ openpyxl==3.1.2
 numpy<2.0.0
 #torch>=2.0.0
 transformers>=4.35.0
+anyio>=4.5
 
 # Integrations
 google-api-python-client==2.111.0
@@ -69,6 +71,7 @@ imap-tools==1.7.1
 #WebSearch
 duckduckgo-search>=4.1.0
 trafilatura>=1.6.0
+ddgs>=1.36
 
 #Agent
 paramiko>=3.4.0

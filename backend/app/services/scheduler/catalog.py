@@ -63,6 +63,15 @@ def _f(
     return field
 
 
+def _ansible_fields() -> List[Dict[str, Any]]:
+    return [
+        _f("role_name", "Role name", required=True, placeholder="nginx_hardening"),
+        _f("description", "Description", "textarea", required=True),
+        _f("supported_os", "Supported OS (comma-separated)", placeholder="Debian, RedHat",
+           default=["Debian", "RedHat"], transform="csv_list"),
+    ]
+
+
 AGENT_INPUT_SPECS: Dict[str, Dict[str, Any]] = {
     "branch_code_review": {
         "label": "Code Review",
@@ -200,6 +209,86 @@ AGENT_INPUT_SPECS: Dict[str, Dict[str, Any]] = {
             {"when": {"mode": ["organization"]}, "fields": ["query", "org_id"]},
         ],
     },
+    "ansible_role_generator": {
+    "label": "Ansible Role Generator",
+    "fields": _ansible_fields(),
+    },
+    "gitea_ansible_role_generator": {
+    "label": "Gitea Ansible Role Generator",
+    "fields": _ansible_fields(),
+    },
+    "wikijs": {
+        "label": "WikiJS Assistant",
+        "fields": [
+            _f("mode", "Mode", "select", required=True, default="read", options=[
+                ("search", "search — full-text search"),
+                ("read", "read — load page + LLM analysis"),
+                ("create", "create — generate new page via LLM"),
+                ("update", "update — revise existing page via LLM"),
+            ]),
+            _f("query", "Search query", placeholder="installation",
+               show_when={"mode": ["search"]}, required_when={"mode": ["search"]}),
+            _f("path", "Page path", placeholder="mqtt-install",
+               show_when={"mode": ["read", "create", "update"]},
+               required_when={"mode": ["read", "create", "update"]}),
+            _f("title", "Page title", placeholder="Installation MQTT Debian",
+               show_when={"mode": ["create"]}, required_when={"mode": ["create"]}),
+            _f("prompt", "Generation prompt", "textarea",
+               placeholder="Explain in 3 points how to install and configure X...",
+               show_when={"mode": ["create"]}, required_when={"mode": ["create"]}),
+            _f("instruction", "Update instruction", "textarea",
+               placeholder='Add a "Troubleshooting" section at the bottom...',
+               show_when={"mode": ["update"]}, required_when={"mode": ["update"]}),
+            _f("question", "Question (optional)", placeholder="How is SSL configured here?",
+               show_when={"mode": ["read"]}),
+            _f("context", "Context (optional)", "textarea",
+               placeholder="Paste logs, config files, bash history...",
+               show_when={"mode": ["create", "update"]}),
+            _f("tags", "Tags, comma-separated (optional)", placeholder="infra, installation",
+               show_when={"mode": ["create"]}, transform="csv_list"),
+            _f("locale", "Locale override (optional)", placeholder="en",
+               show_when={"mode": ["read", "search"]}),
+        ],
+    },
+    "sonarqube": {
+        "label": "SonarQube Security",
+        "fields": [
+            _f("mode", "Mode", "select", required=True, default="projects", options=[
+                ("projects", "projects — inventory"),
+                ("overview", "overview — quality gate + metrics + posture"),
+                ("issues", "issues — vulnerabilities / bugs"),
+                ("hotspots", "hotspots — security hotspots"),
+                ("remediate", "remediate — LLM fixes"),
+            ]),
+            _f("query", "Project filter", placeholder="backend",
+               show_when={"mode": ["projects"]}),
+            _f("with_quality_gate", "Include quality gate per project", "checkbox",
+               default=False, show_when={"mode": ["projects"]}),
+            _f("project_key", "Project key", placeholder="MON_PROJET",
+               show_when={"mode": ["overview", "issues", "hotspots", "remediate"]},
+               required_when={"mode": ["overview", "issues", "hotspots"]}),
+            _f("issue_keys", "Issue keys, comma-separated (overrides project selection)",
+               placeholder="AY7xK...,AY8zL...",
+               show_when={"mode": ["remediate"]}, transform="csv_list"),
+            _f("branch", "Branch (optional)", placeholder="main",
+               show_when={"mode": ["overview", "issues", "hotspots", "remediate"]}),
+            _f("types", "Types, comma-separated", placeholder="VULNERABILITY,BUG",
+               show_when={"mode": ["issues", "remediate"]}, transform="csv_upper"),
+            _f("severities", "Severities, comma-separated", placeholder="BLOCKER,CRITICAL",
+               show_when={"mode": ["issues", "remediate"]}, transform="csv_upper"),
+            _f("in_new_code_period", "New code only", "checkbox", default=False,
+               show_when={"mode": ["overview", "issues", "hotspots"]}),
+            _f("page_size", "Page size", "number", default=50, min=1, max=500,
+               show_when={"mode": ["projects", "issues", "hotspots"]}),
+            _f("max_remediations", "Max remediations", "number", default=3, min=1, max=20,
+               show_when={"mode": ["remediate"]}),
+            _f("snippet_context", "Snippet context (lines around issue)", "number",
+               default=15, min=0, max=100, show_when={"mode": ["remediate"]}),
+        ],
+        "one_of": [
+            {"when": {"mode": ["remediate"]}, "fields": ["project_key", "issue_keys"]},
+        ],
+    },
 }
 
 
@@ -224,11 +313,13 @@ def _coerce(field: Dict[str, Any], value: Any, errors: List[str], hosts: Optiona
 
     if ftype in ("text", "textarea"):
         text = str(value).strip()
-        if field.get("transform") == "csv_list":
+        if field.get("transform") in ("csv_list", "csv_upper"):
             if isinstance(value, list):
                 items = [str(x).strip() for x in value if str(x).strip()]
             else:
                 items = [x.strip() for x in text.split(",") if x.strip()]
+            if field["transform"] == "csv_upper":
+                items = [i.upper() for i in items]
             return items or None
         return text or None
 
@@ -372,7 +463,20 @@ def build_manifest(
             return [_action(WRITE_EXTERNAL, "Review the branch, push fixes and/or open a pull request")]
         return [_action(READ_EXTERNAL, "Read the branch on the Git repository")]
 
-    # legal_fiscal, accounting_finance, travel_expert: LLM + local RAG only
+    if agent_type in ("ansible_role_generator", "gitea_ansible_role_generator"):
+        return [_action(
+            WRITE_EXTERNAL,
+            f"Generate Ansible role '{cleaned_input.get('role_name', '?')}' and push it to the Git repository",
+        )]
+
+    if agent_type == "wikijs":
+        if mode in ("create", "update"):
+            verb = "Create" if mode == "create" else "Update"
+            return [_action(WRITE_EXTERNAL, f"{verb} the Wiki.js page '{cleaned_input.get('path', '?')}'")]
+        return [_action(READ_EXTERNAL, f"Query Wiki.js (read-only, mode {mode})")]
+
+    if agent_type == "sonarqube":
+        return [_action(READ_EXTERNAL, f"Query SonarQube (read-only, mode {mode})")]
     return [_action(INTERNAL, "LLM analysis (no external action)")]
 
 
