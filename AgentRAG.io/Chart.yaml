@@ -2,17 +2,14 @@ apiVersion: v2
 name: agentragio
 description: AgentRAG.io - Retrieval-Augmented Generation & MCP Agent
 type: application
-version: 1.1.77
-appVersion: "1.1.77"
+version: 1.1.78
+appVersion: "1.1.78"
 keywords:
   - rag
   - llm
   - ai-assistant
   - langchain
   - chromadb
-  - agent
-  - MCP
-  - scheduler
 
 home: https://github.com/iwebbo/AgentRAG.io
 sources:
