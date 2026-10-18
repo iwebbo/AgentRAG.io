@@ -403,8 +403,8 @@ class GiteaMCPServer:
 
             # Configure git user pour commits IA
             for cmd in [
-                ["git", "config", "user.email", "ai-agent@codegen.local"],
-                ["git", "config", "user.name",  "AI Code Generator (Gitea)"],
+                ["git", "config", "user.email", "aecodinglocal@gmail.com"],
+                ["git", "config", "user.name",  "AgentRAG.io Agent (Gitea)"],
             ]:
                 subprocess.run(cmd, cwd=path, capture_output=True)
 

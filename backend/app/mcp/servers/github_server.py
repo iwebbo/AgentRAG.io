@@ -475,12 +475,12 @@ class GitHubMCPServer:
             
             # Configure git user pour commits futurs
             subprocess.run(
-                ["git", "config", "user.email", "ai-agent@codegen.local"],
+                ["git", "config", "user.email", "aecodinglocal@gmail.com"],
                 cwd=path,
                 capture_output=True
             )
             subprocess.run(
-                ["git", "config", "user.name", "AI Code Generator"],
+                ["git", "config", "user.name", "AgentRAG.io Agent"],
                 cwd=path,
                 capture_output=True
             )

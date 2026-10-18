@@ -42,6 +42,8 @@ from app.agents.agent_types.ansible_role_generator_agent import AnsibleRoleGener
 from app.agents.agent_types.gitea_ansible_role_generator_agent import GiteaAnsibleRoleGeneratorAgent
 from app.agents.agent_types.wikijs_agent import WikiJSAgent
 from app.agents.agent_types.sonarqube_agent import SonarQubeAgent
+from app.agents.agent_types.github_changelog_agent import GitHubChangelogAgent
+from app.agents.agent_types.gitea_changelog_agent import GiteaChangelogAgent
 
 
 logger = logging.getLogger(__name__)
@@ -67,20 +69,23 @@ MCP_REGISTRY: Dict[str, Type] = {
 class AgentExecutor:
 
     AGENT_TYPES: Dict[str, Type] = {
-        "branch_code_review":  BranchCodeReviewAgent,
-        "code_generator":      CodeGeneratorAgent,
-        "legal_fiscal":        LegalAdvisorAgent,
-        "accounting_finance":  AccountingAdvisorAgent,
-        "travel_expert":       TravelAdvisorAgent,
-        "email_expert":        EmailAgent,
-        "websearch":           WebSearchAgent,
-        "skill":               SkillAgent,
-        "gitea_code_generator": GiteaCodeGeneratorAgent,
-        "datagouv_explorer":   DataGouvAgent,
-        "ansible_role_generator":        AnsibleRoleGeneratorAgent,
-        "gitea_ansible_role_generator":  GiteaAnsibleRoleGeneratorAgent,
-        "wikijs":              WikiJSAgent,
-        "sonarqube":           SonarQubeAgent,
+        "branch_code_review":           BranchCodeReviewAgent,
+        "code_generator":               CodeGeneratorAgent,
+        "legal_fiscal":                 LegalAdvisorAgent,
+        "accounting_finance":           AccountingAdvisorAgent,
+        "travel_expert":                TravelAdvisorAgent,
+        "email_expert":                 EmailAgent,
+        "websearch":                    WebSearchAgent,
+        "skill":                        SkillAgent,
+        "gitea_code_generator":         GiteaCodeGeneratorAgent,
+        "datagouv_explorer":            DataGouvAgent,
+        "ansible_role_generator":       AnsibleRoleGeneratorAgent,
+        "gitea_ansible_role_generator": GiteaAnsibleRoleGeneratorAgent,
+        "wikijs":                       WikiJSAgent,
+        "sonarqube":                    SonarQubeAgent,
+        "github_changelog":             GitHubChangelogAgent,
+        "gitea_changelog":              GiteaChangelogAgent,
+
     }
 
     def __init__(self, db: Session):

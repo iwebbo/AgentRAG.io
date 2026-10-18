@@ -51,6 +51,21 @@ roles/<role_name>/
 └── README.md                # Documentation du rôle (vars, exemple d'usage)
 """
 
+OS_BLOCKS = {
+    "debian":  ("is_debian_ubuntu", "Route to Debian/Ubuntu tasks", "tasks/linux/main.yml"),
+    "ubuntu":  ("is_debian_ubuntu", "Route to Debian/Ubuntu tasks", "tasks/linux/main.yml"),
+    "redhat":  ("is_rhel_fam", "Route to RHEL tasks", "tasks/unix/main.yml"),
+    "el":      ("is_rhel_fam", "Route to RHEL tasks", "tasks/unix/main.yml"),
+    "fedora":  ("is_rhel_fam", "Route to RHEL tasks", "tasks/unix/main.yml"),
+    "amazon":  ("is_rhel_fam", "Route to RHEL tasks", "tasks/unix/main.yml"),
+    "windows": ("is_windows", "Route to Windows tasks", "tasks/windows/main.yml"),
+}
+OS_FACTS = {
+    "is_debian_ubuntu": "{{ ansible_os_family == 'Debian' }}",
+    "is_rhel_fam": "{{ ansible_os_family == 'RedHat' }}",
+    "is_windows": "{{ ansible_os_family == 'Windows' }}",
+}
+
 
 class AnsibleRoleGeneratorAgent(CodeGeneratorAgent):
     """
@@ -83,7 +98,7 @@ class AnsibleRoleGeneratorAgent(CodeGeneratorAgent):
         description = input_data.get("description", "")
         variables: Dict[str, Any] = input_data.get("variables", {})
         dependencies: List[str] = input_data.get("dependencies", [])
-        supported_os: List[str] = input_data.get("supported_os", ["Debian", "RedHat"])
+        supported_os: List[str] = input_data.get("supported_os") or []
 
         # Dérive la branche cible du nom du rôle si non explicitement configurée
         if "target_branch" not in self.config:
@@ -110,6 +125,57 @@ class AnsibleRoleGeneratorAgent(CodeGeneratorAgent):
         # Délègue intégralement au pipeline parent (clone/RAG/LLM/lint/commit/PR)
         async for event in super().execute(mapped_input):
             yield event
+    # ═════════════════════════════════════════════════════════════════════
+    # Fix — conventions OS multi plateform
+    # ═════════════════════════════════════════════════════════════════════
+
+    def _build_os_section(self, platforms: List[str]) -> str:
+        selected: Dict[str, tuple] = {}
+        for p in platforms:
+            entry = OS_BLOCKS.get(p.strip().lower())
+            if entry:
+                selected.setdefault(entry[0], (entry[1], entry[2]))
+
+        if not selected:
+            return "\n".join([
+                "### OS HANDLING: NONE",
+                "No OS platform declared. tasks/main.yml MUST contain the role tasks directly.",
+                "FORBIDDEN: ansible.builtin.setup / gather_facts, set_fact is_*, include_tasks,",
+                "tasks/linux|unix|windows/ directories, any OS conditional (ansible_os_family, when: is_*).",
+                "meta/main.yml galaxy_info.platforms: use a generic Linux entry only.",
+                "Default target: Linux, unless the role name explicitly implies otherwise.",
+            ])
+
+        lines = [
+            f"### OS HANDLING: ONLY {', '.join(platforms)}",
+            "tasks/main.yml MUST be exactly this routing (no tags required on these routing tasks):",
+            "",
+            "- name: Gather facts if not already done",
+            "  ansible.builtin.setup:",
+            "    gather_subset:",
+            "      - 'min'",
+            "",
+            "- name: Detect OS families using native variables",
+            "  ansible.builtin.set_fact:",
+        ]
+        lines += [f'    {v}: "{OS_FACTS[v]}"' for v in selected]
+        for v, (name, path) in selected.items():
+            lines += [
+                "",
+                f"- name: {name}",
+                "  ansible.builtin.include_tasks:",
+                f"    file: {path}",
+                f"  when: {v}",
+            ]
+        allowed = ", ".join(sorted({p.rsplit("/", 1)[0] for _, p in selected.values()}))
+        lines += [
+            "",
+            "STRICT RULES:",
+            f"- Create the real role tasks ONLY in: {allowed} (each with its own main.yml).",
+            "- Do NOT create, mention or route any other OS directory or is_* variable.",
+            "- Do NOT generate Windows content unless Windows is listed above, nor Linux content unless a Linux family is listed.",
+        ]
+        return "\n".join(lines)
 
     # ═════════════════════════════════════════════════════════════════════
     # PROMPT — conventions Ansible Galaxy
@@ -125,7 +191,7 @@ class AnsibleRoleGeneratorAgent(CodeGeneratorAgent):
     ) -> str:
         vars_text = "\n".join(f"  - {k}: {v}" for k, v in variables.items()) or "  (aucune, à déduire du besoin)"
         deps_text = "\n".join(f"  - {d}" for d in dependencies) or "  (aucune)"
-        os_text = ", ".join(supported_os)
+        os_text = ", ".join(supported_os) or "(none declared)"
 
         return f"""Generate a complete Ansible role named '{role_name}' under '{self.roles_path}/{role_name}/'.
 
@@ -142,6 +208,8 @@ Role dependencies (meta/main.yml):
 {deps_text}
 
 Supported OS families (meta/main.yml galaxy_info.platforms): {os_text}
+
+{self._build_os_section(supported_os)}
 
 Conventions to follow strictly:
 1. tasks/main.yml: idempotent tasks, use proper Ansible modules (never shell/command unless no module exists), tag each major task block
