@@ -2,8 +2,8 @@ apiVersion: v2
 name: agentragio
 description: AgentRAG.io - Retrieval-Augmented Generation & MCP Agent
 type: application
-version: 1.1.78
-appVersion: "1.1.78"
+version: 1.1.82
+appVersion: "1.1.82"
 keywords:
   - rag
   - llm
