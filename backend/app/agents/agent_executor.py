@@ -44,6 +44,8 @@ from app.agents.agent_types.wikijs_agent import WikiJSAgent
 from app.agents.agent_types.sonarqube_agent import SonarQubeAgent
 from app.agents.agent_types.github_changelog_agent import GitHubChangelogAgent
 from app.agents.agent_types.gitea_changelog_agent import GiteaChangelogAgent
+from app.agents.agent_types.github_branch_generator_agent import GitHubBranchGeneratorAgent
+from app.agents.agent_types.gitea_branch_generator_agent import GiteaBranchGeneratorAgent
 
 
 logger = logging.getLogger(__name__)
@@ -85,7 +87,8 @@ class AgentExecutor:
         "sonarqube":                    SonarQubeAgent,
         "github_changelog":             GitHubChangelogAgent,
         "gitea_changelog":              GiteaChangelogAgent,
-
+        "github_branch_generator":      GitHubBranchGeneratorAgent,
+        "gitea_branch_generator":       GiteaBranchGeneratorAgent,
     }
 
     def __init__(self, db: Session):

@@ -71,6 +71,27 @@ def _ansible_fields() -> List[Dict[str, Any]]:
            default=["Debian", "RedHat"], transform="csv_list"),
     ]
 
+def _changelog_fields() -> List[Dict[str, Any]]:
+    return [
+        _f("version", "Version", required=True, placeholder="v1.1.78",
+           help="Semantic version set by hand, e.g. v1.1.78 (the git tag / release stays manual)"),
+        _f("pr_number", "Pull request number (optional)", "number", min=1, max=1000000,
+           help="Leave empty to use the latest pull request targeting the base branch"),
+        _f("dry_run", "Dry-run (generate only, no push)", "checkbox", default=False),
+    ]
+
+def _branch_generator_fields() -> List[Dict[str, Any]]:
+    return [
+        _f("prompt", "Generation prompt", "textarea", required=True,
+           placeholder="Create a Helm chart for a FastAPI app..."),
+        _f("branch", "New branch name", required=True, placeholder="feature/ai-generated"),
+        _f("base_branch", "Base branch", placeholder="main"),
+        _f("repo", "Repository override (owner/repo)", placeholder="owner/repo"),
+        _f("commit_message", "Commit message", placeholder="feat: add generated files"),
+        _f("pr_title", "Pull request title", placeholder="feat: add generated files"),
+        _f("context", "Additional context", "textarea"),
+        _f("dry_run", "Dry-run (generate only, push nothing)", "checkbox", default=False),
+    ]
 
 AGENT_INPUT_SPECS: Dict[str, Dict[str, Any]] = {
     "branch_code_review": {
@@ -289,6 +310,22 @@ AGENT_INPUT_SPECS: Dict[str, Dict[str, Any]] = {
             {"when": {"mode": ["remediate"]}, "fields": ["project_key", "issue_keys"]},
         ],
     },
+    "github_changelog": {
+        "label": "GitHub Changelog",
+        "fields": _changelog_fields(),
+    },
+    "gitea_changelog": {
+        "label": "Gitea Changelog",
+        "fields": _changelog_fields(),
+    },
+    "github_branch_generator": {
+        "label": "GitHub Branch Generator",
+        "fields": _branch_generator_fields(),
+    },
+    "gitea_branch_generator": {
+        "label": "Gitea Branch Generator",
+        "fields": _branch_generator_fields(),
+    },
 }
 
 
@@ -468,6 +505,14 @@ def build_manifest(
             WRITE_EXTERNAL,
             f"Generate Ansible role '{cleaned_input.get('role_name', '?')}' and push it to the Git repository",
         )]
+    
+    if agent_type in ("github_changelog", "gitea_changelog"):
+        if cleaned_input.get("dry_run"):
+            return [_action(READ_EXTERNAL, "Read the pull request on the Git repository (dry-run, nothing is pushed)")]
+        return [_action(
+            WRITE_EXTERNAL,
+            f"Generate the changelog for {cleaned_input.get('version', '?')} and push it to the pull request branch",
+        )]
 
     if agent_type == "wikijs":
         if mode in ("create", "update"):
@@ -477,8 +522,18 @@ def build_manifest(
 
     if agent_type == "sonarqube":
         return [_action(READ_EXTERNAL, f"Query SonarQube (read-only, mode {mode})")]
+
+    if agent_type in ("github_branch_generator", "gitea_branch_generator"):
+        if cleaned_input.get("dry_run"):
+            return [_action(INTERNAL, "Generate files with the LLM in a temporary directory (nothing is pushed)")]
+        label = f"Create branch '{cleaned_input.get('branch', '?')}' and push the LLM-generated files"
+        if cleaned_input.get("create_pr", cfg.get("auto_create_pr")):
+            label += " and open a pull request"
+        return [_action(WRITE_EXTERNAL, label)]
     return [_action(INTERNAL, "LLM analysis (no external action)")]
 
+
+## for add
 
 def supported_agent_types() -> List[str]:
     return list(AGENT_INPUT_SPECS.keys())
