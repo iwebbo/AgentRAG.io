@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, ChevronDown, ChevronUp, Send, Loader2, Bot, User, Copy, Check, ExternalLink, History, MessageCircle, Settings } from 'lucide-react';
+import { Plus, Loader2, Copy, Check, ExternalLink, History, MessageCircle, Settings } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import Loading from '../components/common/Loading';
 import Alert from '../components/common/Alert';
-import MarkdownMessage from '../components/common/MarkdownMessage';
-import { StreamingService } from '../services/streaming';
 import api from '../services/api';
 
 
@@ -165,6 +162,58 @@ const AGENT_TYPES = {
       { name: 'description', label: 'Description', type: 'textarea', required: true },
       { name: 'supported_os', label: 'Supported OS (comma-separated)', type: 'text', placeholder: 'Debian, RedHat' },
     ],
+  },
+  github_changelog: {
+    name: 'GitHub Changelog',
+    description: 'Generate CHANGELOG.md from the latest Pull Request targeting the base branch and push it to the PR source branch via MCP GitHub',
+    icon: '☰', color: '#a855f7', badge: 'fixed', mcp: ['github'],
+    defaultConfig: (providers) => ({
+      mcp_servers: ['github'],
+      base_branch: 'main',
+      pr_state: 'open',
+      pr_scan_limit: 30,
+      changelog_path: 'CHANGELOG.md',
+      use_llm: true,
+      language: 'en',
+      skip_ci: false,
+      llm_provider: providers[0]?.name || 'lmstudio',
+      llm_model: 'qwen3.5-4b-claude-4.6-opus-reasoning-distilled',
+      llm_temperature: 0.1,
+    }),
+    mcpConfig: { github: { token: '', repo: '' } },
+    requiredFields: ['github.token', 'github.repo'],
+    executeFields: [
+      { name: 'version', label: 'Version', type: 'text', placeholder: 'v1.1.81', required: true },
+      { name: 'pr_number', label: 'PR number (optional — default: latest PR to base branch)', type: 'number', placeholder: '42' },
+      { name: 'date', label: 'Date (optional — DD/MM/YYYY, default: today)', type: 'text', placeholder: '19/10/2026' },
+      { name: 'dry_run', label: 'Dry run (generate only — no commit, no push)', type: 'checkbox', defaultValue: true },
+    ]
+  },
+  gitea_changelog: {
+    name: 'Gitea Changelog',
+    description: 'Generate CHANGELOG.md from the latest Pull Request targeting the base branch and push it to the PR source branch on a self-hosted Gitea via MCP',
+    icon: '☷', color: '#f97316', badge: 'fixed', mcp: ['gitea'],
+    defaultConfig: (providers) => ({
+      mcp_servers: ['gitea'],
+      base_branch: 'main',
+      pr_state: 'open',
+      pr_scan_limit: 30,
+      changelog_path: 'CHANGELOG.md',
+      use_llm: true,
+      language: 'en',
+      skip_ci: false,
+      llm_provider: providers[0]?.name || 'lmstudio',
+      llm_model: 'qwen3.5-4b-claude-4.6-opus-reasoning-distilled',
+      llm_temperature: 0.1,
+    }),
+    mcpConfig: { gitea: { url: '', token: '', repo: '' } },
+    requiredFields: ['gitea.url', 'gitea.token', 'gitea.repo'],
+    executeFields: [
+      { name: 'version', label: 'Version', type: 'text', placeholder: 'v1.1.81', required: true },
+      { name: 'pr_number', label: 'PR number (optional — default: latest PR to base branch)', type: 'number', placeholder: '42' },
+      { name: 'date', label: 'Date (optional — DD/MM/YYYY, default: today)', type: 'text', placeholder: '19/10/2026' },
+      { name: 'dry_run', label: 'Dry run (generate only — no commit, no push)', type: 'checkbox', defaultValue: true },
+    ]
   },
   datagouv_explorer: {
     name: 'DataGouv Explorer',
@@ -430,8 +479,8 @@ const SKILL_REGISTER_CURL = `curl -X POST https://<host>/api/skills/register \\
 const MCP_SERVERS_STATIC = [
   { key: 'ssh',         transport: 'stdio', credential: 'DB (encrypted)',       tools: 'exec_command, get_system_info, upload_file, download_file, list_directory' },
   { key: 'winrm',       transport: 'stdio', credential: 'DB (encrypted)',       tools: 'exec_powershell, get_system_info, restart_service, list_services, get_event_logs, get_running_processes, exec_cleanup' },
-  { key: 'gitea',       transport: 'HTTP',  credential: 'mcp_config.gitea',     tools: 'clone_repository, get_repo_tree, get_file_content, update_file, commit_and_push, create_branch, create_pull_request' },
-  { key: 'github',      transport: 'HTTP',  credential: 'mcp_config.github',    tools: 'get_file_content, update_file, create_pull_request, list_issues, create_review' },
+  { key: 'gitea',       transport: 'HTTP',  credential: 'mcp_config.gitea',     tools: 'clone_repository, get_repo_tree, get_file_content, update_file, commit_and_push, create_branch, create_pull_request, get_pr, list_prs, list_commits' },
+  { key: 'github',      transport: 'HTTP',  credential: 'mcp_config.github',    tools: 'get_file_content, update_file, create_pull_request, list_issues, create_review, get_pr, list_prs, list_commits, clone_repository, commit_and_push' },
   { key: 'datagouv',    transport: 'HTTP',  credential: 'none (public API)',    tools: 'search_datasets, get_dataset, search_organizations, list_topics, get_topic' },
   { key: 'wikijs',      transport: 'HTTP',  credential: 'mcp_config.wikijs',    tools: 'search_pages, get_page, create_page, update_page' },
   { key: 'sonarqube',   transport: 'HTTP',  credential: 'mcp_config.sonarqube', tools: 'validate_auth, get_system_status, list_projects, get_project, list_branches, search_issues, fetch_all_issues, get_issue, get_issues_summary, list_security_hotspots, get_security_hotspot, get_rule, get_source_snippet, get_quality_gate, get_measures' },
@@ -464,6 +513,16 @@ const DOC_ENTRIES = [
       { n: 2, text: 'mode=projects → inventory, optional query filter and quality gate per project. mode=overview + project_key → quality gate, metrics, issue facets, hotspots, LLM posture analysis.' },
       { n: 3, text: 'mode=issues + project_key → filtered issues (types, severities, branch, new code). mode=hotspots → security hotspots with risk description and fix recommendations.' },
       { n: 4, text: 'mode=remediate + project_key (top N vulnerabilities) or issue_keys → SonarQube rule + real source snippet (+ optional repository RAG) → LLM fix per issue. Enable Repository RAG + RAG project ID in the agent configuration to align fixes with your codebase conventions.' }
+    ]
+  },
+  {
+    key: 'changelog', icon: '☰', title: 'Changelog agents (GitHub / Gitea)',
+    desc: 'Fixed agents github_changelog and gitea_changelog (same workflow, different MCP server). They build a CHANGELOG.md section from a Pull Request and push it to the PR source branch. No tag and no release are created.',
+    steps: [
+      { n: 1, text: 'Create the agent with mcp_config.github = { token, repo } (github_changelog) or mcp_config.gitea = { url, token, repo } (gitea_changelog). repo is owner/repo. Use exactly these keys: any other key prevents the MCP server from being registered.' },
+      { n: 2, text: 'Execution: Version is required and must be a semantic version (v1.1.81). PR number is optional — by default the agent takes the latest PR (highest number) targeting the base branch, within the configured PR state (open | closed | all). Date is optional (DD/MM/YYYY, default: today).' },
+      { n: 3, text: 'Dry run is enabled by default: the section is generated and rendered in the output, nothing is committed. Untick it to clone the PR branch, update the changelog file and push (MCP commit_and_push). A run for a version already present replaces that section; if nothing changes, nothing is pushed.' },
+      { n: 4, text: 'The entry is written by the LLM as validated JSON (summary, features, fixes) and always rendered as Markdown by the code. If Use LLM is off, or the output is invalid, a deterministic conventional-commits fallback is used. PRs coming from a fork are refused.' }
     ]
   },
   {
@@ -531,7 +590,7 @@ const ExecutionHistoryPanel = ({ agent, agentType, onClose, onReopenExec }) => {
 
   const getPromptLabel = (exec) => {
     const d = exec.input_data || {};
-    return d.prompt || d.query || d.branch || d.project_key || d.mode || `#${exec.id?.slice(0, 8)}`;
+    return d.prompt || d.query || d.branch || d.project_key || d.version || d.mode || `#${exec.id?.slice(0, 8)}`;
   };
 
   return (
@@ -746,6 +805,84 @@ const SonarQubeConfigFields = ({ formData, updateConfigField }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // AGENT CONFIG FIELDS — partagé entre Create et Edit
 // ─────────────────────────────────────────────────────────────────────────────
+// Connexion Gitea (url / token / repo) — utilisée par gitea_changelog (Create et Edit)
+const GiteaConnectionFields = ({ formData, updateConfigField }) => (
+  <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+    <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>Gitea configuration</h3>
+    <div className="form-group"><label className="form-label">Gitea URL * <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>base URL, without /api/v1</span></label><input type="text" className="form-input" value={formData.mcp_config.gitea?.url || ''} onChange={e => updateConfigField('mcp_config.gitea.url', e.target.value)} placeholder="http://gitea.example.local:3000" /></div>
+    <div className="form-group"><label className="form-label">Access token * <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>Settings → Applications</span></label><input type="password" className="form-input" value={formData.mcp_config.gitea?.token || ''} onChange={e => updateConfigField('mcp_config.gitea.token', e.target.value)} placeholder="Gitea access token" /></div>
+    <div className="form-group"><label className="form-label">Repository * <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>owner/repo</span></label><input type="text" className="form-input" value={formData.mcp_config.gitea?.repo || ''} onChange={e => updateConfigField('mcp_config.gitea.repo', e.target.value)} placeholder="username/my-repo" /></div>
+  </div>
+);
+
+// Config commune des agents changelog (github_changelog / gitea_changelog) — partagé entre Create et Edit
+const ChangelogConfigFields = ({ formData, updateConfigField }) => {
+  const cfg = formData.config || {};
+  const hint = { fontSize: 'var(--text-xs)', color: 'var(--gray-500)' };
+  const num = (v, d) => (v === '' || isNaN(parseInt(v, 10)) ? d : parseInt(v, 10));
+  const inline = { background: 'var(--gray-200)', padding: '0 3px', borderRadius: '3px' };
+  return (
+    <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+      <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>Changelog configuration</h3>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Base branch <span style={hint}>target of the PRs</span></label>
+          <input type="text" className="form-input" value={cfg.base_branch || 'main'} onChange={e => updateConfigField('config.base_branch', e.target.value)} placeholder="main" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">PR state</label>
+          <select className="form-input" value={cfg.pr_state || 'open'} onChange={e => updateConfigField('config.pr_state', e.target.value)}>
+            <option value="open">open</option>
+            <option value="closed">closed</option>
+            <option value="all">all</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">PR scan limit <span style={hint}>1–100</span></label>
+          <input type="number" min="1" max="100" className="form-input" value={cfg.pr_scan_limit ?? 30} onChange={e => updateConfigField('config.pr_scan_limit', num(e.target.value, 30))} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Changelog path</label>
+          <input type="text" className="form-input" value={cfg.changelog_path || 'CHANGELOG.md'} onChange={e => updateConfigField('config.changelog_path', e.target.value)} placeholder="CHANGELOG.md" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Changelog title <span style={hint}>optional — default: &lt;repo&gt; Changelog</span></label>
+          <input type="text" className="form-input" value={cfg.changelog_title || ''} onChange={e => updateConfigField('config.changelog_title', e.target.value)} placeholder="AgentRAG.io Changelog" />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--spacing-3)', alignItems: 'end' }}>
+        <div className="form-group">
+          <label className="form-label">Language</label>
+          <select className="form-input" value={cfg.language || 'en'} onChange={e => updateConfigField('config.language', e.target.value)}>
+            <option value="en">en</option>
+            <option value="fr">fr</option>
+            {cfg.language && !['en', 'fr'].includes(cfg.language) && <option value={cfg.language}>{cfg.language}</option>}
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--spacing-4)', flexWrap: 'wrap', paddingBottom: 'var(--spacing-3)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>
+            <input type="checkbox" checked={cfg.use_llm !== false} onChange={e => updateConfigField('config.use_llm', e.target.checked)} />Use LLM
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>
+            <input type="checkbox" checked={!!cfg.skip_ci} onChange={e => updateConfigField('config.skip_ci', e.target.checked)} />Skip CI <span style={hint}>[skip ci]</span>
+          </label>
+        </div>
+      </div>
+
+      <div style={{ border: '1px solid var(--info)', borderLeft: '3px solid var(--info)', borderRadius: 'var(--radius)', padding: 'var(--spacing-2) var(--spacing-3)', backgroundColor: 'rgba(96,165,250,0.06)', fontSize: 'var(--text-xs)', color: 'var(--gray-700)', lineHeight: '1.6' }}>
+        <strong style={{ color: 'var(--info)' }}>How it works.</strong> The version is set at execution. The agent finds the latest PR targeting the base branch (or the PR number you give),
+        merges the new section into <code style={inline}>{cfg.changelog_path || 'CHANGELOG.md'}</code> and pushes it to the PR source branch. No tag and no release are created.
+        With Use LLM disabled, or if the LLM output is invalid, a deterministic conventional-commits fallback is used.
+      </div>
+    </div>
+  );
+};
+
 const AgentConfigFields = ({ agentType, formData, providers, skills, updateConfigField }) => (
   <>
     <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
@@ -784,7 +921,7 @@ const AgentConfigFields = ({ agentType, formData, providers, skills, updateConfi
       </div>
     )}
 
-    {['branch_code_review', 'code_generator', 'ansible_role_generator'].includes(agentType) && (
+    {['branch_code_review', 'code_generator', 'ansible_role_generator', 'github_changelog'].includes(agentType) && (
       <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
         <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>GitHub configuration</h3>
         <div className="form-group"><label className="form-label">GitHub token *</label><input type="password" className="form-input" value={formData.mcp_config.github?.token || ''} onChange={e => updateConfigField('mcp_config.github.token', e.target.value)} placeholder="ghp_..." /></div>
@@ -810,6 +947,14 @@ const AgentConfigFields = ({ agentType, formData, providers, skills, updateConfi
           ))}
         </div>
       </div>
+    )}
+
+    {agentType === 'gitea_changelog' && (
+      <GiteaConnectionFields formData={formData} updateConfigField={updateConfigField} />
+    )}
+
+    {['github_changelog', 'gitea_changelog'].includes(agentType) && (
+      <ChangelogConfigFields formData={formData} updateConfigField={updateConfigField} />
     )}
 
     {agentType === 'datagouv_explorer' && (
@@ -1051,193 +1196,14 @@ const AgentConfigModal = ({ agent, providers, skills, onClose, onSaved }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EMBEDDED CHAT — panneau droit post-exécution
+// AGENT RUNS — exécutions en arrière-plan (drawer latéral + pastilles)
+//   - useAgentRuns        : état + flux SSE de N exécutions simultanées
+//   - ExecuteAgentModal   : formulaire de lancement uniquement (phase "idle" d'origine)
+//   - AgentRunDrawer      : Output / Logs / History d'une exécution
+//   - AgentRunDock        : drawer + pastilles quand il est réduit
 // ─────────────────────────────────────────────────────────────────────────────
-const EmbeddedChat = ({ conversationId, agentName }) => {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [streaming, setStreaming] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [copiedIndex, setCopiedIndex] = useState(null);
-  const [chatSettings, setChatSettings] = useState({ provider_name: 'ollama', model: 'llama2', temperature: 0.7, reasoning_mode: 'standard' });
-  const messagesEndRef = useRef(null);
-  const streamingServiceRef = useRef(new StreamingService());
 
-  useEffect(() => {
-    if (!conversationId) return;
-    (async () => {
-      try {
-        setLoadingHistory(true);
-        const res = await api.get(`/api/conversations/${conversationId}`);
-        const conv = res.data;
-        setMessages(conv.messages || []);
-        setChatSettings(prev => ({
-          ...prev,
-          provider_name: conv.provider_name || prev.provider_name,
-          model: conv.model || prev.model,
-          temperature: conv.temperature || prev.temperature,
-        }));
-      } catch (e) {
-        console.error('Failed to load agent conversation:', e);
-      } finally {
-        setLoadingHistory(false);
-      }
-    })();
-  }, [conversationId]);
-
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
-  const appendChunk = (chunk) => {
-    setMessages(prev => {
-      const updated = [...prev];
-      updated[updated.length - 1] = {
-        ...updated[updated.length - 1],
-        content: updated[updated.length - 1].content + chunk
-      };
-      return updated;
-    });
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || streaming || !conversationId) return;
-    const content = input.trim();
-    setInput('');
-    setMessages(prev => [
-      ...prev,
-      { role: 'user', content, created_at: new Date().toISOString() },
-      { role: 'assistant', content: '', created_at: new Date().toISOString() }
-    ]);
-    setStreaming(true);
-    const request = { message: content, conversation_id: conversationId, ...chatSettings };
-    await streamingServiceRef.current.startSSEStream(
-      request,
-      appendChunk,
-      (err) => {
-        console.error('Chat stream error:', err);
-        setStreaming(false);
-        streamingServiceRef.current.startWebSocketStream(request, appendChunk, () => setStreaming(false), () => setStreaming(false));
-      },
-      () => setStreaming(false)
-    );
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-  };
-
-  const handleCopy = async (content, idx) => {
-    await navigator.clipboard.writeText(content).catch(() => {});
-    setCopiedIndex(idx);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  if (loadingHistory) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--gray-500)', gap: 'var(--spacing-2)' }}>
-        <Loader2 size={18} className="animate-spin" />
-        <span style={{ fontSize: 'var(--text-sm)' }}>Loading conversation…</span>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ padding: 'var(--spacing-3) var(--spacing-4)', borderBottom: '1px solid var(--gray-200)', backgroundColor: 'var(--gray-50)', flexShrink: 0 }}>
-        <div style={{ fontSize: 'var(--text-sm)', fontWeight: '600', color: 'var(--gray-800)' }}>
-          💬 Continue with {agentName}
-        </div>
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', marginTop: '2px' }}>
-          {chatSettings.provider_name} · {chatSettings.model}
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--spacing-3)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
-        {messages.length === 0 && (
-          <div style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: 'var(--text-sm)', marginTop: 'var(--spacing-8)' }}>
-            No messages yet — ask a follow-up question
-          </div>
-        )}
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            style={{ display: 'flex', gap: 'var(--spacing-2)', alignItems: 'flex-start', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}
-          >
-            <div style={{
-              width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-              background: msg.role === 'user' ? 'var(--primary)' : 'var(--gray-200)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: msg.role === 'user' ? 'white' : 'var(--gray-600)'
-            }}>
-              {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
-            </div>
-            <div
-              style={{ maxWidth: '80%' }}
-              onMouseEnter={e => { const a = e.currentTarget.querySelector('.msg-actions'); if (a) a.style.opacity = '1'; }}
-              onMouseLeave={e => { const a = e.currentTarget.querySelector('.msg-actions'); if (a) a.style.opacity = '0'; }}
-            >
-              <div style={{
-                padding: 'var(--spacing-2) var(--spacing-3)',
-                borderRadius: 'var(--radius)',
-                background: msg.role === 'user' ? 'var(--primary)' : 'var(--gray-100)',
-                color: msg.role === 'user' ? 'white' : 'var(--gray-900)',
-                fontSize: 'var(--text-sm)', lineHeight: '1.6'
-              }}>
-                {msg.content
-                  ? <MarkdownMessage content={msg.content} isStreaming={streaming && idx === messages.length - 1} />
-                  : <Loader2 size={14} className="animate-spin" style={{ color: 'var(--gray-400)' }} />
-                }
-              </div>
-              {msg.content && !(streaming && idx === messages.length - 1) && (
-                <div className="msg-actions" style={{
-                  opacity: 0, transition: 'opacity 0.15s', marginTop: '4px',
-                  display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start'
-                }}>
-                  <button
-                    onClick={() => handleCopy(msg.content, idx)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 6px', fontSize: '11px', color: copiedIndex === idx ? 'var(--success)' : 'var(--gray-500)', background: 'var(--gray-100)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                  >
-                    {copiedIndex === idx ? <Check size={11} /> : <Copy size={11} />}
-                    {copiedIndex === idx ? 'Copied' : 'Copy'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div style={{ padding: 'var(--spacing-3)', borderTop: '1px solid var(--gray-200)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 'var(--spacing-2)', alignItems: 'flex-end', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', padding: 'var(--spacing-2) var(--spacing-3)', background: 'var(--bg)' }}>
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={streaming}
-            placeholder="Ask a follow-up question…"
-            rows={1}
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', resize: 'none', fontSize: 'var(--text-sm)', lineHeight: '1.5', maxHeight: '120px', padding: 0 }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || streaming}
-            style={{ background: 'var(--primary)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '6px 10px', color: 'white', cursor: input.trim() && !streaming ? 'pointer' : 'not-allowed', opacity: input.trim() && !streaming ? 1 : 0.4, display: 'flex', alignItems: 'center' }}
-          >
-            {streaming ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-          </button>
-        </div>
-        <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '4px', textAlign: 'center' }}>
-          {streaming ? 'Thinking…' : 'Enter to send · Shift+Enter for new line'}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Extraction générique du texte d'un payload agent (inchangé, remonté au scope module)
+// Extraction générique du texte d'un payload agent
 const extractContent = (data) => {
   if (!data) return '';
   if (typeof data === 'string') return data;
@@ -1245,79 +1211,225 @@ const extractContent = (data) => {
     || (data.data && extractContent(data.data)) || '';
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EXECUTE MODAL — SSE stream + split panel post-exécution
-// ─────────────────────────────────────────────────────────────────────────────
-const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skills, preloadExec }) => {
-  const navigate = useNavigate();
-  const [executeData, setExecuteData] = useState({});
-  const [error, setError] = useState(null);
-  const [phase, setPhase] = useState('idle'); // idle | running | done | failed
-  const [steps, setSteps] = useState([]);
-  const [outputText, setOutputText] = useState('');
-  const [conversationId, setConversationId] = useState(null);
-  const [logsExpanded, setLogsExpanded] = useState(false);
-  const [activeLeftTab, setActiveLeftTab] = useState('output'); // 'output' | 'history'
-  const [panelExecutions, setPanelExecutions] = useState([]);
-  const [panelExecLoading, setPanelExecLoading] = useState(false);
-  const outputRef = useRef(null);
-  const readerRef = useRef(null);
+// Rendu d'un output_data / payload result selon le type d'agent
+const renderAgentOutput = (agentTypeKey, raw) => {
+  if (!raw) return '';
+  if (agentTypeKey === 'sonarqube') {
+    const formatted = formatSonarResult(raw);
+    if (formatted) return formatted;
+  }
+  if (typeof raw === 'string') return raw;
+  return extractContent(raw) || JSON.stringify(raw, null, 2);
+};
 
-  const isSonar = agent.agent_type === 'sonarqube';
+const RUN_STEP_COLOR = { init: 'var(--info)', log: 'var(--gray-500)', progress: 'var(--primary)', result: 'var(--success)', error: 'var(--error)' };
 
-  // Rendu d'un output_data / payload result selon le type d'agent
-  const renderOutput = (raw) => {
-    if (!raw) return '';
-    if (isSonar) {
-      const formatted = formatSonarResult(raw);
-      if (formatted) return formatted;
+const RUN_STATUS_META = {
+  running: { dot: '#f59e0b', label: 'Running…', color: 'var(--text-primary)' },
+  done:    { dot: 'var(--success)', label: 'Completed', color: 'var(--success)' },
+  failed:  { dot: 'var(--error)', label: 'Failed', color: 'var(--error)' },
+};
+
+// Lien direct vers la conversation (logs) de l'agent — ouvert dans un nouvel onglet
+const buildChatUrl = (conversationId) => (conversationId ? `${window.location.origin}/chat/${conversationId}` : null);
+
+const getExecConversationId = (exec) => {
+  const out = exec?.output_data;
+  return exec?.input_data?.conversation_id
+    || (typeof out === 'object' && out !== null && (out.conversation_id || out.data?.conversation_id))
+    || null;
+};
+
+const getRunLabel = (inputData) => {
+  const d = inputData || {};
+  return String(d.prompt || d.query || d.branch || d.project_key || d.version || d.mode || '');
+};
+
+const fmtElapsed = (ms) => {
+  const s = Math.max(0, Math.round((ms || 0) / 1000));
+  return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+};
+
+const runIconBtn = (disabled) => ({
+  width: '28px', height: '28px', borderRadius: 'var(--radius)', border: '1px solid var(--gray-300)',
+  background: 'var(--gray-100)', color: 'var(--gray-600)', cursor: disabled ? 'not-allowed' : 'pointer',
+  opacity: disabled ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', padding: 0,
+});
+
+let runSeq = 0;
+const nextRunId = () => `run-${Date.now()}-${++runSeq}`;
+
+const useAgentRuns = ({ onExecuted } = {}) => {
+  const [runs, setRuns] = useState([]);
+  const [activeRunId, setActiveRunId] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [rerun, setRerun] = useState(null); // { agentId, values } — préremplissage de "Run again"
+  const readersRef = useRef({});
+  const onExecutedRef = useRef(onExecuted);
+
+  useEffect(() => { onExecutedRef.current = onExecuted; });
+
+  // Démontage de la page : on coupe les flux ouverts (comportement identique à l'ancienne modal)
+  useEffect(() => () => {
+    Object.values(readersRef.current).forEach(r => { r.cancel().catch(() => {}); });
+    readersRef.current = {};
+  }, []);
+
+  const patchRun = (id, patch) => setRuns(prev => prev.map(r => (
+    r.id === id ? { ...r, ...(typeof patch === 'function' ? patch(r) : patch) } : r
+  )));
+
+  const addStep = (id, type, message) => patchRun(id, r => ({
+    steps: [...r.steps, { type, message, ts: new Date().toLocaleTimeString() }],
+  }));
+
+  const streamRun = async (id, agent, inputData) => {
+    const token = localStorage.getItem('access_token');
+    try {
+      const response = await fetch(`/api/agents/${agent.id}/execute/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ input_data: inputData, trigger: 'manual' })
+      });
+
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      readersRef.current[id] = reader;
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop() ?? '';
+
+        for (const block of blocks) {
+          if (!block.trim()) continue;
+          let eventType = '', dataStr = '';
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+            else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
+          }
+          if (!dataStr) continue;
+          try {
+            const data = JSON.parse(dataStr);
+            if (eventType === 'init') {
+              patchRun(id, { conversationId: data.conversation_id || null });
+              addStep(id, 'init', '🚀 Execution started');
+            } else if (eventType === 'log' || eventType === 'progress') {
+              const msg = data.data?.message || data.message || data.data?.step || '';
+              if (msg) addStep(id, eventType, msg);
+            } else if (eventType === 'result') {
+              const c = renderAgentOutput(agent.agent_type, data);
+              if (c) patchRun(id, r => ({ outputText: r.outputText + (r.outputText ? '\n\n' : '') + c }));
+              addStep(id, 'result', '✅ Result received');
+            } else if (eventType === 'done') {
+              const c = renderAgentOutput(agent.agent_type, data.output);
+              patchRun(id, r => ({
+                conversationId: r.conversationId || data.conversation_id || null,
+                outputText: r.outputText || c || '',
+                status: 'done',
+                finishedAt: Date.now(),
+              }));
+              if (onExecutedRef.current) onExecutedRef.current();
+            } else if (eventType === 'error') {
+              throw new Error(data.error || 'Agent execution failed');
+            }
+          } catch (pe) {
+            if (!pe.message?.includes('JSON')) throw pe;
+          }
+        }
+      }
+      patchRun(id, r => (r.status === 'running' ? { status: 'done', finishedAt: Date.now() } : {}));
+    } catch (err) {
+      patchRun(id, r => (r.status === 'done' ? {} : {
+        error: err.message || 'Execution failed',
+        status: 'failed',
+        finishedAt: Date.now(),
+      }));
+    } finally {
+      delete readersRef.current[id];
     }
-    if (typeof raw === 'string') return raw;
-    return extractContent(raw) || JSON.stringify(raw, null, 2);
   };
 
-  useEffect(() => {
+  const selectRun = (id) => { setActiveRunId(id); setDrawerOpen(true); };
+
+  const startRun = (agent, inputData, formValues) => {
+    const id = nextRunId();
+    const run = {
+      id, execId: null, agent, agentId: agent.id, status: 'running',
+      outputText: '', steps: [], conversationId: null, error: null,
+      startedAt: Date.now(), finishedAt: null, durationMs: null,
+      formValues, label: getRunLabel(inputData),
+    };
+    setRuns(prev => [...prev, run]);
+    selectRun(id);
+    streamRun(id, agent, inputData);
+  };
+
+  // Ouvre une exécution passée (historique) dans le drawer, sans écraser un run en cours
+  const openFromExecution = (agent, exec) => {
+    const existing = runs.find(r => r.execId && r.execId === exec.id);
+    if (existing) { selectRun(existing.id); return; }
+    const out = exec.output_data;
+    const text = (out && typeof out === 'object')
+      ? renderAgentOutput(agent.agent_type, out)
+      : (typeof out === 'string' ? out : '');
+    const startedAt = exec.started_at ? new Date(exec.started_at).getTime() : Date.now();
+    const errMsg = exec.error_message || exec.error;
+    const id = nextRunId();
+    const run = {
+      id, execId: exec.id, agent, agentId: agent.id,
+      status: exec.status === 'failed' ? 'failed' : 'done',
+      outputText: text, steps: [], conversationId: getExecConversationId(exec),
+      error: exec.status === 'failed' && typeof errMsg === 'string' ? errMsg : null,
+      startedAt, finishedAt: startedAt, durationMs: exec.execution_time_ms || null,
+      formValues: undefined, label: getRunLabel(exec.input_data),
+    };
+    setRuns(prev => [...prev, run]);
+    selectRun(id);
+  };
+
+  const dismissRun = (id) => {
+    const target = runs.find(r => r.id === id);
+    if (!target || target.status === 'running') return;
+    const remaining = runs.filter(r => r.id !== id);
+    setRuns(remaining);
+    if (activeRunId === id) {
+      if (remaining.length) setActiveRunId(remaining[remaining.length - 1].id);
+      else { setActiveRunId(null); setDrawerOpen(false); }
+    }
+  };
+
+  return { runs, activeRunId, drawerOpen, setDrawerOpen, startRun, openFromExecution, selectRun, dismissRun, rerun, setRerun };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXECUTE MODAL — formulaire de lancement. L'exécution et le flux SSE sont
+// pris en charge par useAgentRuns / AgentRunDrawer.
+// ─────────────────────────────────────────────────────────────────────────────
+const ExecuteAgentModal = ({ agent, agentType, onClose, onStart, hosts, initialValues }) => {
+  const [executeData, setExecuteData] = useState(() => {
     const defaults = {};
     agentType?.executeFields?.forEach(f => {
       if (f.defaultValue !== undefined) defaults[f.name] = f.defaultValue;
     });
     // l'agent sonarqube démarre sur le mode par défaut de sa configuration
-    if (isSonar && agent.config?.mode) defaults.mode = agent.config.mode;
-    setExecuteData(defaults);
-  }, [agentType]);
+    if (agent.agent_type === 'sonarqube' && agent.config?.mode) defaults.mode = agent.config.mode;
+    return { ...defaults, ...(initialValues || {}) };
+  });
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
-  }, [outputText]);
-
-  useEffect(() => () => { readerRef.current?.cancel().catch(() => {}); }, []);
-
-  // Préchargement depuis l'historique (cas slide-in → popup)
-  useEffect(() => {
-    if (!preloadExec) return;
-    const convId = preloadExec.input_data?.conversation_id || preloadExec.output_data?.conversation_id;
-    const out = preloadExec.output_data;
-    const text = (out && typeof out === 'object')
-      ? renderOutput(out)
-      : (typeof out === 'string' ? out : '');
-    setConversationId(convId || null);
-    setOutputText(text);
-    setPhase('done');
-    setActiveLeftTab('output');
-    setSteps([]);
-  }, [preloadExec]);
-
-  useEffect(() => {
-    if (activeLeftTab !== 'history') return;
-    (async () => {
-      setPanelExecLoading(true);
-      try {
-        const res = await api.get(`/api/agents/${agent.id}/executions?limit=30`);
-        setPanelExecutions(res.data);
-      } catch (_) {}
-      finally { setPanelExecLoading(false); }
-    })();
-  }, [activeLeftTab, agent.id]);
+  const isSonar = agent.agent_type === 'sonarqube';
 
   const handleChange = (name, value) => setExecuteData(prev => ({ ...prev, [name]: value }));
 
@@ -1369,6 +1481,12 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
         test_mode: d.test_mode ?? false,
       };
     }
+    if (agent.agent_type === 'github_changelog' || agent.agent_type === 'gitea_changelog') {
+      const r = { version: String(d.version || '').trim(), dry_run: d.dry_run ?? true };
+      if (d.pr_number !== undefined && String(d.pr_number).trim() !== '') r.pr_number = parseInt(String(d.pr_number).replace('#', ''), 10);
+      if (d.date && String(d.date).trim()) r.date = String(d.date).trim();
+      return r;
+    }
     if (agent.agent_type === 'wikijs') {
       const r = { mode: d.mode || 'read' };
       if (d.query) r.query = d.query;
@@ -1410,6 +1528,18 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
       if (!executeData.host) { setError('Target host is required'); return false; }
       return true;
     }
+    if (agent.agent_type === 'github_changelog' || agent.agent_type === 'gitea_changelog') {
+      // mêmes règles que le backend (VERSION_RE / DATE_RE / pr_number entier positif)
+      if (!/^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(String(executeData.version || '').trim())) {
+        setError('Version must be a semantic version such as v1.1.81');
+        return false;
+      }
+      const date = String(executeData.date || '').trim();
+      if (date && !/^\d{2}\/\d{2}\/\d{4}$/.test(date)) { setError('Date must use the DD/MM/YYYY format'); return false; }
+      const pr = String(executeData.pr_number ?? '').trim();
+      if (pr && !/^#?[1-9]\d*$/.test(pr)) { setError('PR number must be a positive integer'); return false; }
+      return true;
+    }
     if (agent.agent_type === 'sonarqube') {
       const m = executeData.mode || 'projects';
       const hasKeys = m === 'remediate' && executeData.issue_keys?.trim();
@@ -1426,84 +1556,10 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
     return true;
   };
 
-  const addStep = (type, message) => setSteps(prev => [...prev, { type, message, ts: new Date().toLocaleTimeString() }]);
-
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!validate()) return;
     setError(null);
-    setPhase('running');
-    setSteps([]);
-    setOutputText('');
-    setConversationId(null);
-
-    const token = localStorage.getItem('access_token');
-    try {
-      const response = await fetch(`/api/agents/${agent.id}/execute/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ input_data: buildInputData(), trigger: 'manual' })
-      });
-
-      if (!response.ok) {
-        const e = await response.json().catch(() => ({}));
-        throw new Error(e.detail || `HTTP ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      readerRef.current = reader;
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split('\n\n');
-        buffer = blocks.pop() ?? '';
-
-        for (const block of blocks) {
-          if (!block.trim()) continue;
-          let eventType = '', dataStr = '';
-          for (const line of block.split('\n')) {
-            if (line.startsWith('event: ')) eventType = line.slice(7).trim();
-            else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
-          }
-          if (!dataStr) continue;
-          try {
-            const data = JSON.parse(dataStr);
-            if (eventType === 'init') {
-              setConversationId(data.conversation_id);
-              addStep('init', '🚀 Execution started');
-            } else if (eventType === 'log' || eventType === 'progress') {
-              const msg = data.data?.message || data.message || data.data?.step || '';
-              if (msg) addStep(eventType, msg);
-            } else if (eventType === 'result') {
-              const c = renderOutput(data);
-              if (c) setOutputText(prev => prev + (prev ? '\n\n' : '') + c);
-              addStep('result', '✅ Result received');
-            } else if (eventType === 'done') {
-              setConversationId(prev => prev || data.conversation_id);
-              const c = renderOutput(data.output);
-              if (c) setOutputText(prev => prev || c);
-              setPhase('done');
-              if (onExecuted) onExecuted();
-            } else if (eventType === 'error') {
-              throw new Error(data.error || 'Agent execution failed');
-            }
-          } catch (pe) {
-            if (!pe.message?.includes('JSON')) throw pe;
-          }
-        }
-      }
-      setPhase(prev => prev === 'running' ? 'done' : prev);
-
-    } catch (err) {
-      setError(err.message || 'Execution failed');
-      setPhase('failed');
-    }
+    onStart(buildInputData(), executeData);
   };
 
   const renderField = (field) => {
@@ -1535,246 +1591,316 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onExecuted, hosts, skill
   const isSkill = agent.agent_type === 'skill';
   const emailMode = executeData.mode;
   const emailConditional = ['to', 'subject', 'body', 'instructions', 'context', 'limit', 'unread_only', 'auto_send'];
-  const stepColor = { init: 'var(--info)', log: 'var(--gray-500)', progress: 'var(--primary)', result: 'var(--success)', error: 'var(--error)' };
 
-  // ── IDLE : modal compacte identique à l'original ──────────────────────────
-  if (phase === 'idle') {
-    return (
-      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
-        <div className="card" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflow: 'auto' }}>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-4)' }}>
-            <div>
-              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '600', marginBottom: 'var(--spacing-1)' }}>
-                Execute — {agent.name}
-              </h2>
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-600)' }}>
-                {agentType?.name} · {agentType?.mcp?.join(', ') || 'no MCP'}
-              </p>
-            </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-600)', fontSize: '1.25rem', lineHeight: 1 }}>✕</button>
-          </div>
-
-          {error && <Alert type="error" style={{ marginBottom: 'var(--spacing-4)' }} onClose={() => setError(null)}>{error}</Alert>}
-
-          {isSkill ? (
-            <SkillExecuteFields executeData={executeData} onChange={handleChange} hosts={hosts} />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
-              {agentType?.executeFields?.map(field => {
-                if (emailConditional.includes(field.name) && agent.agent_type === 'email_expert') {
-                  if (!emailMode) return null;
-                  if (emailMode === 'send_email' && !['to', 'subject', 'body'].includes(field.name)) return null;
-                  if (emailMode === 'send_email_llm' && !['to', 'subject', 'instructions', 'context', 'auto_send'].includes(field.name)) return null;
-                  if (emailMode === 'analyze_inbox' && !['limit', 'unread_only'].includes(field.name)) return null;
-                }
-                if (isSonar && field.name !== 'mode') {
-                  const allowed = SONAR_FIELDS_BY_MODE[executeData.mode || 'projects'] || [];
-                  if (!allowed.includes(field.name)) return null;
-                }
-                return (
-                  <div key={field.name} className="form-group">
-                    {field.type !== 'checkbox' && <label className="form-label">{field.label}{field.required && ' *'}</label>}
-                    {renderField(field)}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 'var(--spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--spacing-6)', paddingTop: 'var(--spacing-4)', borderTop: '1px solid var(--gray-300)' }}>
-            <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" onClick={handleSubmit}>▶ Execute agent</Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── RUNNING / DONE / FAILED : fullscreen split 50/50 ─────────────────────
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.78)', display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-5)' }}>
-      <div style={{ width: '100%', maxWidth: '1280px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', height: '100%' }}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
+      <div className="card" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflow: 'auto' }}>
 
-        {/* ── Panneau gauche : output terminal ── */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-3)', flexShrink: 0 }}>
-            <div>
-              <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: '600', marginBottom: '2px' }}>
-                {agentType?.icon} {agent.name}
-              </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', fontSize: 'var(--text-xs)' }}>
-                {phase === 'running' && (
-                  <><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block', animation: 'pulse 1s infinite' }} />Running…</>
-                )}
-                {phase === 'done' && (
-                  <><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} /><span style={{ color: 'var(--success)', fontWeight: '600' }}>Completed</span></>
-                )}
-                {phase === 'failed' && (
-                  <><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--error)', display: 'inline-block' }} /><span style={{ color: 'var(--error)', fontWeight: '600' }}>Failed</span></>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              disabled={phase === 'running'}
-              style={{ background: 'none', border: 'none', cursor: phase === 'running' ? 'not-allowed' : 'pointer', color: 'var(--gray-400)', fontSize: '1.1rem', opacity: phase === 'running' ? 0.3 : 1 }}
-            >✕</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-4)' }}>
+          <div>
+            <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '600', marginBottom: 'var(--spacing-1)' }}>
+              Execute — {agent.name}
+            </h2>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-600)' }}>
+              {agentType?.name} · {agentType?.mcp?.join(', ') || 'no MCP'}
+            </p>
           </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-600)', fontSize: '1.25rem', lineHeight: 1 }}>✕</button>
+        </div>
 
-          {error && <Alert type="error" style={{ marginBottom: 'var(--spacing-3)', flexShrink: 0 }}>{error}</Alert>}
+        {error && <Alert type="error" style={{ marginBottom: 'var(--spacing-4)' }} onClose={() => setError(null)}>{error}</Alert>}
 
-          {/* Onglets Output / History */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid var(--bg-surface-hover)', borderRadius: 'var(--radius)', overflow: 'hidden', marginBottom: 'var(--spacing-3)' }}>
-            {/* Tab bar */}
-            <div style={{ display: 'flex', background: 'var(--bg-surface-hover)', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }}>
-              {[
-                { key: 'output', label: 'Output', icon: <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: phase === 'running' ? '#f59e0b' : phase === 'done' ? 'var(--status-success)' : '#ef4444', display: 'inline-block', marginRight: '6px' }} /> },
-                { key: 'history', label: 'History', icon: <History size={12} style={{ marginRight: '5px', verticalAlign: '-1px' }} /> }
-              ].map(tab => (
-                <button key={tab.key} onClick={() => setActiveLeftTab(tab.key)} style={{
-                  padding: '6px 14px', background: 'none', border: 'none',
-                  borderBottom: activeLeftTab === tab.key ? '2px solid var(--info)' : '2px solid transparent',
-                  color: activeLeftTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                  fontWeight: activeLeftTab === tab.key ? '600' : '400'
-                }}>
-                  {tab.icon}{tab.label}
-                  {tab.key === 'history' && panelExecutions.length > 0 && (
-                    <span style={{ marginLeft: '5px', fontSize: '10px', background: 'var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: '99px', padding: '1px 5px' }}>
-                      {panelExecutions.length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Output tab */}
-            {activeLeftTab === 'output' && (
-              <div ref={outputRef} style={{ flex: 1, overflowY: 'auto', padding: 'var(--spacing-3)', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--bg-main)', color: 'var(--text-primary)' }}>
-                {outputText || <span style={{ color: 'var(--text-muted)' }}>{phase === 'running' ? 'Waiting for output…' : 'No output captured.'}</span>}
-                {phase === 'running' && <span style={{ color: 'var(--info)', animation: 'pulse 1s infinite' }}>▋</span>}
-              </div>
-            )}
-
-            {/* History tab */}
-            {activeLeftTab === 'history' && (
-              <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-card)' }}>
-                {panelExecLoading && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--spacing-8)', gap: 'var(--spacing-2)', color: 'var(--gray-500)' }}>
-                    <Loader2 size={15} className="animate-spin" /> Loading…
-                  </div>
-                )}
-                {!panelExecLoading && panelExecutions.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--gray-500)', fontSize: 'var(--text-sm)' }}>No executions yet</div>
-                )}
-                {!panelExecLoading && panelExecutions.map((exec) => {
-                  const stMap = { success: { bg: 'rgba(29,158,117,.15)', color: 'var(--success-fg)', dot: 'var(--status-success)' }, failed: { bg: 'rgba(226,75,74,.12)', color: 'var(--danger-fg)', dot: 'var(--status-error)' }, running: { bg: 'rgba(96,165,250,.15)', color: 'var(--info-fg)', dot: 'var(--status-info)' } };
-                  const st = stMap[exec.status] || { bg: 'rgba(136,135,128,.15)', color: 'var(--neutral-fg)', dot: 'var(--text-muted)' };
-                  const eOut = exec.output_data;
-                  const convId = exec.input_data?.conversation_id
-                    || (typeof eOut === 'object' && eOut !== null && (eOut.conversation_id || eOut.data?.conversation_id))
-                    || null;
-                  const label = (exec.input_data?.prompt || exec.input_data?.query || exec.input_data?.branch || exec.input_data?.project_key || exec.input_data?.mode || `#${exec.id?.slice(0, 8)}`);
-                  const dur = exec.execution_time_ms ? (exec.execution_time_ms < 60000 ? `${Math.round(exec.execution_time_ms / 1000)}s` : `${Math.floor(exec.execution_time_ms / 60000)}m ${Math.round((exec.execution_time_ms % 60000) / 1000)}s`) : '';
-                  const dt = exec.started_at ? new Date(exec.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                  return (
-                    <div key={exec.id} style={{ padding: '9px 14px', borderBottom: '1px solid var(--gray-200)', display: 'grid', gridTemplateColumns: '8px 1fr auto auto', gap: '9px', alignItems: 'center' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.dot, display: 'inline-block', flexShrink: 0 }} />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--gray-900)' }}>{label}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '1px' }}>{dt}{dur ? ` · ${dur}` : ''}{exec.tokens_used ? ` · ${exec.tokens_used.toLocaleString()} tok` : ''}</div>
-                      </div>
-                      <span style={{ fontSize: '10px', fontWeight: '600', padding: '1px 7px', borderRadius: '99px', background: st.bg, color: st.color, flexShrink: 0 }}>{exec.status}</span>
-                      <button
-                        title={convId ? 'Load this run' : 'No conversation'}
-                        disabled={!convId}
-                        onClick={() => {
-                          if (!convId) return;
-                          const text = (eOut && typeof eOut === 'object')
-                            ? renderOutput(eOut)
-                            : (typeof eOut === 'string' ? eOut : '');
-                          setConversationId(convId);
-                          setOutputText(text);
-                          setPhase('done');
-                          setActiveLeftTab('output');
-                          setSteps([]);
-                        }}
-                        style={{ background: 'none', border: 'none', cursor: convId ? 'pointer' : 'not-allowed', color: 'var(--gray-500)', opacity: convId ? 1 : 0.3, padding: '3px', display: 'flex', alignItems: 'center' }}
-                      >
-                        <ExternalLink size={14} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Logs accordion */}
-          {steps.length > 0 && (
-            <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', overflow: 'hidden', flexShrink: 0, marginBottom: 'var(--spacing-3)' }}>
-              <button
-                onClick={() => setLogsExpanded(p => !p)}
-                style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--gray-50)', border: 'none', borderBottom: logsExpanded ? '1px solid var(--gray-200)' : 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}
-              >
-                <span>Execution logs ({steps.length})</span>
-                {logsExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              </button>
-              {logsExpanded && (
-                <div style={{ maxHeight: '140px', overflowY: 'auto', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  {steps.map((s, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '11px' }}>
-                      <span style={{ color: 'var(--gray-400)', flexShrink: 0, fontFamily: 'monospace' }}>{s.ts}</span>
-                      <span style={{ color: stepColor[s.type] || 'var(--gray-600)', wordBreak: 'break-word' }}>{s.message}</span>
-                    </div>
-                  ))}
+        {isSkill ? (
+          <SkillExecuteFields executeData={executeData} onChange={handleChange} hosts={hosts} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+            {agentType?.executeFields?.map(field => {
+              if (emailConditional.includes(field.name) && agent.agent_type === 'email_expert') {
+                if (!emailMode) return null;
+                if (emailMode === 'send_email' && !['to', 'subject', 'body'].includes(field.name)) return null;
+                if (emailMode === 'send_email_llm' && !['to', 'subject', 'instructions', 'context', 'auto_send'].includes(field.name)) return null;
+                if (emailMode === 'analyze_inbox' && !['limit', 'unread_only'].includes(field.name)) return null;
+              }
+              if (isSonar && field.name !== 'mode') {
+                const allowed = SONAR_FIELDS_BY_MODE[executeData.mode || 'projects'] || [];
+                if (!allowed.includes(field.name)) return null;
+              }
+              return (
+                <div key={field.name} className="form-group">
+                  {field.type !== 'checkbox' && <label className="form-label">{field.label}{field.required && ' *'}</label>}
+                  {renderField(field)}
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Footer actions */}
-          <div style={{ display: 'flex', gap: 'var(--spacing-2)', justifyContent: 'flex-end', flexShrink: 0 }}>
-            {(phase === 'done' || phase === 'failed') && (
-              <Button variant="ghost" size="sm" onClick={() => { setPhase('idle'); setError(null); setSteps([]); setOutputText(''); setConversationId(null); }}>
-                Run Again
-              </Button>
-            )}
-            {phase === 'done' && conversationId && (
-              <Button variant="ghost" size="sm" icon={ExternalLink} onClick={() => navigate(`/chat/${conversationId}`)}>
-                Full Chat
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" onClick={onClose} disabled={phase === 'running'}>
-              {phase === 'running' ? 'Running…' : 'Close'}
-            </Button>
+              );
+            })}
           </div>
-        </div>
+        )}
 
-        {/* ── Panneau droit : chat embarqué ── */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-          {phase === 'running' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 'var(--spacing-3)', padding: 'var(--spacing-6)' }}>
-              <Loader2 size={32} className="animate-spin" style={{ color: 'var(--primary)' }} />
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)', textAlign: 'center' }}>
-                Chat will be available once the agent completes
-              </p>
-            </div>
-          ) : conversationId ? (
-            <EmbeddedChat conversationId={conversationId} agentName={agent.name} />
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--gray-400)', fontSize: 'var(--text-sm)' }}>
-              No conversation linked to this execution
-            </div>
-          )}
+        <div style={{ display: 'flex', gap: 'var(--spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--spacing-6)', paddingTop: 'var(--spacing-4)', borderTop: '1px solid var(--gray-300)' }}>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={handleSubmit}>▶ Execute agent</Button>
         </div>
-
       </div>
     </div>
   );
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RUN DRAWER — panneau latéral droit, non bloquant (la liste d'agents reste utilisable)
+// ─────────────────────────────────────────────────────────────────────────────
+const AgentRunDrawer = ({ run, runs, onSelect, onMinimize, onDismiss, onRunAgain, onOpenExecution }) => {
+  const [tab, setTab] = useState('output'); // output | logs | history
+  const [executions, setExecutions] = useState([]);
+  const [execLoading, setExecLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [, setTick] = useState(0);
+  const outputRef = useRef(null);
+
+  const agentType = AGENT_TYPES[run.agent.agent_type];
+  const meta = RUN_STATUS_META[run.status] || RUN_STATUS_META.running;
+  const isRunning = run.status === 'running';
+  const chatUrl = buildChatUrl(run.conversationId);
+  const elapsed = run.durationMs ?? ((run.finishedAt || Date.now()) - run.startedAt);
+
+  // chrono live tant que l'exécution tourne
+  useEffect(() => {
+    if (!isRunning) return undefined;
+    const i = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(i);
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (tab === 'output' && outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
+  }, [run.outputText, tab]);
+
+  useEffect(() => {
+    if (tab !== 'history') return undefined;
+    let cancelled = false;
+    (async () => {
+      setExecLoading(true);
+      try {
+        const res = await api.get(`/api/agents/${run.agentId}/executions?limit=30`);
+        if (!cancelled) setExecutions(res.data);
+      } catch (_) { /* silencieux comme l'ancien onglet History */ }
+      finally { if (!cancelled) setExecLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [tab, run.agentId, run.status]);
+
+  const handleCopy = async () => {
+    if (!chatUrl) return;
+    await navigator.clipboard.writeText(chatUrl).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const TABS = [
+    { key: 'output', label: 'Output' },
+    { key: 'logs', label: `Logs${run.steps.length ? ` (${run.steps.length})` : ''}` },
+    { key: 'history', label: 'History' },
+  ];
+
+  const stMap = {
+    success: { bg: 'rgba(29,158,117,.15)', color: 'var(--success-fg)', dot: 'var(--status-success)' },
+    failed: { bg: 'rgba(226,75,74,.12)', color: 'var(--danger-fg)', dot: 'var(--status-error)' },
+    running: { bg: 'rgba(96,165,250,.15)', color: 'var(--info-fg)', dot: 'var(--status-info)' },
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(560px, 100vw)', zIndex: 900, background: 'var(--bg-card)', borderLeft: '1px solid var(--gray-200)', boxShadow: '-4px 0 24px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Header */}
+      <div style={{ padding: 'var(--spacing-3) var(--spacing-4)', borderBottom: '1px solid var(--gray-200)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--spacing-3)', flexShrink: 0 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: '600', fontSize: 'var(--text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {agentType?.icon} {run.agent.name}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', marginTop: '3px', minWidth: 0 }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: meta.dot, display: 'inline-block', flexShrink: 0, animation: isRunning ? 'pulse 1s infinite' : 'none' }} />
+            <span style={{ color: meta.color, fontWeight: isRunning ? '400' : '600' }}>{meta.label}</span>
+            <span style={{ color: 'var(--gray-500)' }}>· {fmtElapsed(elapsed)}</span>
+            {run.label && (
+              <span style={{ color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>· {run.label}</span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          <button title="Minimize (the run keeps going)" onClick={onMinimize} style={runIconBtn(false)}>—</button>
+          <button title={isRunning ? 'Cannot close while running — minimize instead' : 'Close and remove from the list'} disabled={isRunning} onClick={() => onDismiss(run.id)} style={runIconBtn(isRunning)}>✕</button>
+        </div>
+      </div>
+
+      {/* Sélecteur d'exécutions (si plusieurs runs) */}
+      {runs.length > 1 && (
+        <div style={{ display: 'flex', gap: '6px', padding: '8px var(--spacing-3)', borderBottom: '1px solid var(--gray-200)', overflowX: 'auto', flexShrink: 0 }}>
+          {runs.map(r => {
+            const m = RUN_STATUS_META[r.status] || RUN_STATUS_META.running;
+            const active = r.id === run.id;
+            return (
+              <button key={r.id} onClick={() => onSelect(r.id)} title={r.label || r.agent.name} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '99px', border: active ? '1px solid var(--primary)' : '1px solid var(--gray-300)', background: active ? 'rgba(96,165,250,.12)' : 'var(--gray-100)', color: active ? 'var(--text-primary)' : 'var(--gray-600)', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: m.dot, display: 'inline-block', animation: r.status === 'running' ? 'pulse 1s infinite' : 'none' }} />
+                {r.agent.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {run.error && (
+        <div style={{ padding: 'var(--spacing-3) var(--spacing-4) 0', flexShrink: 0 }}>
+          <Alert type="error">{run.error}</Alert>
+        </div>
+      )}
+
+      {/* Onglets */}
+      <div style={{ display: 'flex', background: 'var(--bg-surface-hover)', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0, marginTop: run.error ? 'var(--spacing-3)' : 0 }}>
+        {TABS.map(tb => (
+          <button key={tb.key} onClick={() => setTab(tb.key)} style={{
+            padding: '8px 16px', background: 'none', border: 'none',
+            borderBottom: tab === tb.key ? '2px solid var(--info)' : '2px solid transparent',
+            color: tab === tb.key ? 'var(--text-primary)' : 'var(--text-muted)',
+            fontSize: '12px', cursor: 'pointer', fontWeight: tab === tb.key ? '600' : '400',
+            display: 'flex', alignItems: 'center'
+          }}>
+            {tb.key === 'history' && <History size={12} style={{ marginRight: '5px' }} />}
+            {tb.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenu */}
+      {tab === 'output' && (
+        <div ref={outputRef} style={{ flex: 1, overflowY: 'auto', padding: 'var(--spacing-3)', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--bg-main)', color: 'var(--text-primary)' }}>
+          {run.outputText || <span style={{ color: 'var(--text-muted)' }}>{isRunning ? 'Waiting for output…' : 'No output captured.'}</span>}
+          {isRunning && <span style={{ color: 'var(--info)', animation: 'pulse 1s infinite' }}>▋</span>}
+        </div>
+      )}
+
+      {tab === 'logs' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--spacing-3)', background: 'var(--bg-main)' }}>
+          {run.steps.length === 0 && (
+            <div style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+              {isRunning ? 'Waiting for logs…' : 'No logs captured for this run.'}
+            </div>
+          )}
+          {run.steps.map((s, i) => (
+            <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '12px', padding: '2px 0' }}>
+              <span style={{ color: 'var(--gray-400)', flexShrink: 0, fontFamily: 'monospace', fontSize: '11px' }}>{s.ts}</span>
+              <span style={{ color: RUN_STEP_COLOR[s.type] || 'var(--gray-600)', wordBreak: 'break-word' }}>{s.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-card)' }}>
+          {execLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--spacing-8)', gap: 'var(--spacing-2)', color: 'var(--gray-500)' }}>
+              <Loader2 size={15} className="animate-spin" /> Loading…
+            </div>
+          )}
+          {!execLoading && executions.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--gray-500)', fontSize: 'var(--text-sm)' }}>No executions yet</div>
+          )}
+          {!execLoading && executions.map((exec) => {
+            const st = stMap[exec.status] || { bg: 'rgba(136,135,128,.15)', color: 'var(--neutral-fg)', dot: 'var(--text-muted)' };
+            const convId = getExecConversationId(exec);
+            const label = exec.input_data?.prompt || exec.input_data?.query || exec.input_data?.branch || exec.input_data?.project_key || exec.input_data?.version || exec.input_data?.mode || `#${exec.id?.slice(0, 8)}`;
+            const dur = exec.execution_time_ms ? (exec.execution_time_ms < 60000 ? `${Math.round(exec.execution_time_ms / 1000)}s` : `${Math.floor(exec.execution_time_ms / 60000)}m ${Math.round((exec.execution_time_ms % 60000) / 1000)}s`) : '';
+            const dt = exec.started_at ? new Date(exec.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            return (
+              <div key={exec.id} style={{ padding: '9px 14px', borderBottom: '1px solid var(--gray-200)', display: 'grid', gridTemplateColumns: '8px 1fr auto auto', gap: '9px', alignItems: 'center', background: exec.id === run.execId ? 'rgba(96,165,250,.08)' : 'transparent' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.dot, display: 'inline-block', flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--gray-900)' }}>{label}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '1px' }}>{dt}{dur ? ` · ${dur}` : ''}{exec.tokens_used ? ` · ${exec.tokens_used.toLocaleString()} tok` : ''}</div>
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: '600', padding: '1px 7px', borderRadius: '99px', background: st.bg, color: st.color, flexShrink: 0 }}>{exec.status}</span>
+                <button
+                  title={convId ? 'Load this run' : 'No conversation'}
+                  disabled={!convId}
+                  onClick={() => convId && onOpenExecution(run.agent, exec)}
+                  style={{ background: 'none', border: 'none', cursor: convId ? 'pointer' : 'not-allowed', color: 'var(--gray-500)', opacity: convId ? 1 : 0.3, padding: '3px', display: 'flex', alignItems: 'center' }}
+                >
+                  <ExternalLink size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Footer : lien chat (nouvel onglet) + actions */}
+      <div style={{ padding: 'var(--spacing-3) var(--spacing-4)', borderTop: '1px solid var(--gray-200)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
+        {chatUrl ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', background: 'var(--gray-100)', minWidth: 0 }}>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '11px', color: 'var(--gray-600)', userSelect: 'all' }}>{chatUrl}</span>
+            <button title="Copy link" onClick={handleCopy} style={{ ...runIconBtn(false), width: '24px', height: '24px', color: copied ? 'var(--success)' : 'var(--gray-600)' }}>
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </button>
+          </div>
+        ) : (
+          <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>Chat link available once the run is initialised.</div>
+        )}
+        <div style={{ display: 'flex', gap: 'var(--spacing-2)', alignItems: 'center', justifyContent: 'flex-end' }}>
+          <Button variant="ghost" size="sm" onClick={() => onRunAgain(run)} disabled={isRunning}>Run Again</Button>
+          {chatUrl ? (
+            <a href={chatUrl} target="_blank" rel="noopener noreferrer" title="Open the agent conversation (logs) in a new tab" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: 'var(--radius)', background: 'var(--primary)', color: 'white', fontSize: 'var(--text-sm)', fontWeight: '600', textDecoration: 'none' }}>
+              <ExternalLink size={13} /> Open chat
+            </a>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: 'var(--radius)', background: 'var(--gray-200)', color: 'var(--gray-500)', fontSize: 'var(--text-sm)', fontWeight: '600', opacity: 0.6, cursor: 'not-allowed' }}>
+              <ExternalLink size={13} /> Open chat
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUN DOCK — drawer de l'exécution active, ou pastilles quand il est réduit
+// ─────────────────────────────────────────────────────────────────────────────
+const AgentRunDock = ({ runs, activeRunId, drawerOpen, onSelect, onMinimize, onDismiss, onRunAgain, onOpenExecution }) => {
+  if (!runs.length) return null;
+  const active = runs.find(r => r.id === activeRunId) || runs[runs.length - 1];
+
+  if (drawerOpen && active) {
+    return (
+      <AgentRunDrawer
+        key={active.id}
+        run={active}
+        runs={runs}
+        onSelect={onSelect}
+        onMinimize={onMinimize}
+        onDismiss={onDismiss}
+        onRunAgain={onRunAgain}
+        onOpenExecution={onOpenExecution}
+      />
+    );
+  }
+
+  return (
+    <div style={{ position: 'fixed', right: '20px', bottom: '20px', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', maxHeight: '60vh', overflowY: 'auto' }}>
+      {runs.map(r => {
+        const m = RUN_STATUS_META[r.status] || RUN_STATUS_META.running;
+        const agentType = AGENT_TYPES[r.agent.agent_type];
+        return (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: `1px solid ${m.dot}`, borderRadius: '99px', boxShadow: '0 6px 20px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <button onClick={() => onSelect(r.id)} title={r.label || r.agent.name} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '12px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: m.dot, display: 'inline-block', animation: r.status === 'running' ? 'pulse 1s infinite' : 'none' }} />
+              <span style={{ fontWeight: '600' }}>{agentType?.icon} {r.agent.name}</span>
+              <span style={{ color: m.color }}>{r.status === 'running' ? 'running…' : r.status === 'done' ? 'done ✓' : 'failed ✗'}</span>
+            </button>
+            {r.status !== 'running' && (
+              <button title="Dismiss" onClick={() => onDismiss(r.id)} style={{ background: 'none', border: 'none', borderLeft: '1px solid var(--gray-200)', cursor: 'pointer', color: 'var(--gray-500)', padding: '8px 10px', fontSize: '12px' }}>✕</button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOSTS TAB
@@ -2055,7 +2181,6 @@ const Agents = () => {
   const [showExecuteModal, setShowExecuteModal] = useState(false);
   const [showRegisterSkill, setShowRegisterSkill] = useState(false);
   const [historyAgent, setHistoryAgent] = useState(null); // agent dont on affiche l'historique
-  const [preloadExec, setPreloadExec] = useState(null);  // exec à précharger dans le popup
   const [selectedAgentType, setSelectedAgentType] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [configAgent, setConfigAgent] = useState(null);
@@ -2159,6 +2284,8 @@ const Agents = () => {
 
   // Callback post-exécution : refresh silencieux, le modal reste ouvert
   const handleAgentExecuted = () => { setTimeout(refreshAgentsSilent, 1000); };
+
+  const agentRuns = useAgentRuns({ onExecuted: handleAgentExecuted });
 
   const updateConfigField = (path, value) => {
     const keys = path.split('.');
@@ -2305,9 +2432,7 @@ const Agents = () => {
             agentType={AGENT_TYPES[historyAgent.agent_type]}
             onClose={() => setHistoryAgent(null)}
             onReopenExec={(exec) => {
-              setSelectedAgent(historyAgent);
-              setPreloadExec(exec);
-              setShowExecuteModal(true);
+              agentRuns.openFromExecution(historyAgent, exec);
               setHistoryAgent(null);
             }}
           />
@@ -2321,13 +2446,32 @@ const Agents = () => {
           <ExecuteAgentModal
             agent={selectedAgent}
             agentType={AGENT_TYPES[selectedAgent.agent_type]}
-            onClose={() => { setShowExecuteModal(false); setSelectedAgent(null); setPreloadExec(null); }}
-            onExecuted={handleAgentExecuted}
             hosts={hosts}
-            skills={skills}
-            preloadExec={preloadExec}
+            initialValues={agentRuns.rerun?.agentId === selectedAgent.id ? agentRuns.rerun.values : undefined}
+            onClose={() => { setShowExecuteModal(false); setSelectedAgent(null); agentRuns.setRerun(null); }}
+            onStart={(inputData, formValues) => {
+              agentRuns.startRun(selectedAgent, inputData, formValues);
+              setShowExecuteModal(false);
+              setSelectedAgent(null);
+              agentRuns.setRerun(null);
+            }}
           />
         )}
+
+        <AgentRunDock
+          runs={agentRuns.runs}
+          activeRunId={agentRuns.activeRunId}
+          drawerOpen={agentRuns.drawerOpen}
+          onSelect={agentRuns.selectRun}
+          onMinimize={() => agentRuns.setDrawerOpen(false)}
+          onDismiss={agentRuns.dismissRun}
+          onOpenExecution={agentRuns.openFromExecution}
+          onRunAgain={(run) => {
+            agentRuns.setRerun({ agentId: run.agent.id, values: run.formValues });
+            setSelectedAgent(run.agent);
+            setShowExecuteModal(true);
+          }}
+        />
 
         {showCreateModal && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--spacing-4)' }}>
@@ -2399,7 +2543,7 @@ const Agents = () => {
                     </div>
                   )}
 
-                  {['branch_code_review', 'code_generator', 'ansible_role_generator'].includes(selectedAgentType) && (
+                  {['branch_code_review', 'code_generator', 'ansible_role_generator', 'github_changelog'].includes(selectedAgentType) && (
                     <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
                       <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>GitHub configuration</h3>
                       <div className="form-group"><label className="form-label">GitHub token * <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>Required for code operations</span></label><input type="password" className="form-input" value={formData.mcp_config.github?.token || ''} onChange={e => updateConfigField('mcp_config.github.token', e.target.value)} placeholder="ghp_..." /></div>
@@ -2425,6 +2569,14 @@ const Agents = () => {
                         ))}
                       </div>
                     </div>
+                  )}
+
+                  {selectedAgentType === 'gitea_changelog' && (
+                    <GiteaConnectionFields formData={formData} updateConfigField={updateConfigField} />
+                  )}
+
+                  {['github_changelog', 'gitea_changelog'].includes(selectedAgentType) && (
+                    <ChangelogConfigFields formData={formData} updateConfigField={updateConfigField} />
                   )}
 
                   {selectedAgentType === 'datagouv_explorer' && (

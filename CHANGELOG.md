@@ -1,15 +1,17 @@
 # AgentRAG.io Changelog
 
-## Version v1.1.82 - [18/10/2026]
+## Version v1.1.83 - [19/10/2026]
 
-This release fixes critical issues in the AgentRAG backend's extension handling, specifically addressing problems with role prompt generation and OS detection for Git repository operations.
+Review branch with UI updates to the Agents page and backend code generator agent configuration
 
 ---
 
-**Fixes & Bug Resolutions**
+### New Features & Enhancements
 
-*   **Agent executor:** Fixed build role prompt and OS detection for agent gitX functionality
-*   **Ansible role generator agent:** Improved Git repository handling with corrected role prompts and system detection
-*   **GitHub changelog agent:** Enhanced Git operations through refined prompt generation and OS identification
+#### Agents page frontend updates
+Significant changes to the frontend Agents.jsx component with net addition of 152 lines
+
+*   **UI modifications:** Frontend changes to the Agents page interface
+*   **Component updates:** Modifications to agent display and interaction elements
 
 ---
