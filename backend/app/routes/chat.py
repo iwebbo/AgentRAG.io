@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import asyncio
 
 from app.database import get_db
-from app.models import User, Conversation
+from app.models import User, Conversation, Message
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.dependencies import get_current_user
 from app.services.llm_service import LLMService
@@ -66,7 +66,9 @@ async def stream_chat(
         provider_name=request.provider_name,
         model=request.model,
         temperature=request.temperature,
-        reasoning_mode=request.reasoning_mode
+        reasoning_mode=request.reasoning_mode,
+        verify_mode=request.verify_mode,
+        emit_events=True
     )
     
     # Create SSE stream with heartbeat
@@ -137,7 +139,8 @@ async def send_message(
         provider_name=request.provider_name,
         model=request.model,
         temperature=request.temperature,
-        reasoning_mode=request.reasoning_mode
+        reasoning_mode=request.reasoning_mode,
+        verify_mode=request.verify_mode
     ):
         full_response += chunk
     
@@ -153,5 +156,6 @@ async def send_message(
         role="assistant",
         content=full_response,
         tokens_used=last_message.tokens_used,
-        latency_ms=last_message.latency_ms
+        latency_ms=last_message.latency_ms,
+        verification=last_message.verification
     )

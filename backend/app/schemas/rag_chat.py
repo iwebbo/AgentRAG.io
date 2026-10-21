@@ -14,6 +14,8 @@ class RAGChatRequest(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     reasoning_mode: str = Field(default="standard")
     top_k: Optional[int] = Field(default=5, ge=1, le=20)
+    # off | annotate | gate — default: server setting VERIFY_MODE
+    verify_mode: Optional[str] = Field(default=None, pattern="^(off|annotate|gate)$")
 
 
 class RAGChatResponse(BaseModel):
@@ -42,6 +44,7 @@ class RAGMessageResponse(BaseModel):
     retrieved_chunks: Optional[str]
     tokens_used: Optional[int]
     latency_ms: Optional[int]
+    verification: Optional[Dict[str, Any]] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

@@ -71,6 +71,21 @@ class Settings(BaseSettings):
     # Public URL of the UI, used to build links in notification emails
     APP_BASE_URL: str = ""
 
+    # ── Answer verification (lint / check / judge / repair) ──────────────────
+    # off | annotate (stream, verdict after) | gate (verify + repair before delivery)
+    VERIFY_MODE: str = "annotate"
+    VERIFY_JUDGE: str = "auto"  # off | auto | always
+    VERIFY_RUFF: bool = True
+    VERIFY_MAX_ROUNDS: int = 2
+    VERIFY_MIN_SCORE: float = 0.7
+    VERIFY_TIMEOUT_SECONDS: int = 45
+    VERIFY_KEEPALIVE_SECONDS: int = 10
+    # Optional dedicated judge (names of one of the user's active providers + model); defaults to the request's
+    VERIFIER_PROVIDER_NAME: str = ""
+    VERIFIER_MODEL: str = ""
+    # Retrieval relevance threshold below which a RAG answer is flagged
+    RAG_MIN_SCORE: float = 0.25
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins string to list."""

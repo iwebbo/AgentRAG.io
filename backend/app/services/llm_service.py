@@ -8,6 +8,9 @@ from datetime import datetime
 from app.models import Provider, Conversation, Message
 from app.services.provider_factory import ProviderFactory
 from app.utils.security import decrypt_api_key
+from app.config import get_settings
+from app.services.verification import StreamEvent, VerificationContext, run_verified_stream
+from app.services.verification_service import build_request_pipeline, effective_mode
 
 logger = logging.getLogger(__name__)
 
@@ -115,10 +118,18 @@ class LLMService:
         provider_name: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
-        reasoning_mode: Optional[str] = None
-    ) -> AsyncGenerator[str, None]:
+        reasoning_mode: Optional[str] = None,
+        verify_mode: Optional[str] = None,
+        emit_events: bool = False
+    ) -> AsyncGenerator[Any, None]:
         """
-        Stream chat completion
+        Stream chat completion.
+
+        Yields `str` chunks (unchanged contract for existing callers). With
+        `emit_events=True` it also yields `StreamEvent` objects (status / verdict /
+        keepalive) for the SSE layer. `verify_mode`: off | annotate | gate
+        (default: settings.VERIFY_MODE). Verification is lint/check/judge based,
+        see app/services/verification.
         """
         start_time = time.time()
         
@@ -172,28 +183,88 @@ class LLMService:
             reasoning_mode or conversation.reasoning_mode
         )
         
+        settings = get_settings()
+        mode = effective_mode(verify_mode)
+        used_model = model or conversation.model
+        used_temperature = temperature or conversation.temperature
+
+        def open_stream(msgs):
+            return llm_provider.stream_completion(
+                messages=msgs, model=used_model, temperature=used_temperature
+            )
+
+        pipeline = None
+        if mode != "off":
+            pipeline = build_request_pipeline(self.db, user_id, llm_provider, used_model, is_rag=False)
+        ctx = VerificationContext(question=message, is_rag=False)
+
         full_response = ""
+        verdict = None
+        saved_message = None
         try:
-            logger.info(f"Starting LLM streaming...")
+            logger.info("Starting LLM streaming (verify mode: %s)...", mode)
             logger.info("Reasoning mode: %s (user input)", reasoning_mode)
             logger.info("Fallback reasoning mode: %s", conversation.reasoning_mode)
-            async for chunk in llm_provider.stream_completion(
+            async for event in run_verified_stream(
+                open_stream=open_stream,
                 messages=messages,
-                model=model or conversation.model,
-                temperature=temperature or conversation.temperature
+                ctx=ctx,
+                pipeline=pipeline,
+                mode=mode,
+                max_rounds=settings.VERIFY_MAX_ROUNDS,
+                min_score=settings.VERIFY_MIN_SCORE,
+                keepalive_seconds=settings.VERIFY_KEEPALIVE_SECONDS,
             ):
-                full_response += chunk
-                yield chunk
-            
+                if event.kind == "token":
+                    yield event.data
+                elif event.kind == "final":
+                    # Persist right away: the answer must survive a client disconnect
+                    # that happens while the judge is still running.
+                    full_response = event.data
+                    saved_message = self._save_assistant_message(
+                        conversation, conversation_id, full_response, start_time,
+                        message, is_first_message, provider_name, model, temperature, reasoning_mode,
+                    )
+                elif event.kind == "verdict":
+                    verdict = event.data
+                    self._attach_verdict(saved_message, verdict)
+                    if emit_events:
+                        yield event
+                elif emit_events:
+                    yield event
+
             logger.info(f"Streaming complete. Response length: {len(full_response)}")
-            
+
         except Exception as e:
             logger.error(f"Streaming error during generation: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
             self.db.rollback()
             raise
-        
+
+    def _attach_verdict(self, assistant_message: Optional[Message], verdict: Any) -> None:
+        if assistant_message is None or verdict is None:
+            return
+        try:
+            assistant_message.verification = verdict.to_dict()
+            self.db.commit()
+        except Exception:
+            logger.exception("Could not persist verification verdict")
+            self.db.rollback()
+
+    def _save_assistant_message(
+        self,
+        conversation: Conversation,
+        conversation_id: UUID,
+        full_response: str,
+        start_time: float,
+        message: str,
+        is_first_message: bool,
+        provider_name: Optional[str],
+        model: Optional[str],
+        temperature: Optional[float],
+        reasoning_mode: Optional[str],
+    ) -> Optional[Message]:
         # Save assistant message WITH token estimation
         try:
             latency_ms = int((time.time() - start_time) * 1000)
@@ -239,13 +310,15 @@ class LLMService:
             logger.info(f"Assistant message saved successfully!")
             logger.info(f"   Message ID: {assistant_message.id}")
             logger.info(f"   Tokens used: {assistant_tokens}")
+            return assistant_message
             
         except Exception as e:
             logger.error(f"CRITICAL: Error saving assistant message: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
             self.db.rollback()
-    
+        return None
+
     async def get_available_models(self, provider_name: str) -> List[str]:
         """
         Get available models for a provider using dynamic fetching

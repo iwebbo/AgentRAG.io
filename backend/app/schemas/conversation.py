@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 from datetime import datetime
 from uuid import UUID
 
@@ -31,6 +31,7 @@ class MessageResponse(BaseModel):
     reasoning_content: Optional[str]
     tokens_used: Optional[int]
     latency_ms: Optional[int]
+    verification: Optional[Dict[str, Any]] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

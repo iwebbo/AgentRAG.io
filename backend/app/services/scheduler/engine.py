@@ -50,6 +50,8 @@ def ensure_schema(retries: int = 30, delay_seconds: int = 5) -> None:
     for attempt in range(1, retries + 1):
         try:
             Base.metadata.create_all(bind=engine, tables=tables)
+            from app.database import ensure_columns
+            ensure_columns()  # worker may start before the backend added `verification`
             logger.info("Scheduler schema is ready")
             return
         except Exception as exc:

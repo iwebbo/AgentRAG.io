@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 from uuid import UUID
 
 
@@ -17,6 +17,8 @@ class ChatRequest(BaseModel):
     reasoning_mode: Optional[str] = Field(None, pattern="^(standard|cot|deep)$")
     system_prompt: Optional[str] = None
     stream: bool = True
+    # off | annotate | gate — default: server setting VERIFY_MODE
+    verify_mode: Optional[str] = Field(None, pattern="^(off|annotate|gate)$")
 
 
 class ChatResponse(BaseModel):
@@ -27,6 +29,7 @@ class ChatResponse(BaseModel):
     reasoning_content: Optional[str] = None
     tokens_used: Optional[int] = None
     latency_ms: Optional[int] = None
+    verification: Optional[Dict[str, Any]] = None
 
 
 class StreamChunk(BaseModel):

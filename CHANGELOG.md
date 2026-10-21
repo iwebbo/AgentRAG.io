@@ -1,32 +1,23 @@
 # AgentRAG.io Changelog
 
-## Version v1.1.84 - [19/10/2026]
+## Version v1.1.86 - [21/10/2026]
 
-Adds Generator X agents for Gitea and GitHub branch generation with scheduler integration and frontend display updates.
+This release introduces logging capabilities for the LLM judge within the verification service. Several backend components were updated alongside new documentation.
 
 ---
 
 ### New Features & Enhancements
 
-#### Generator X Agent Implementation
-Implements new agent types for generating branches from Gitea and GitHub repositories.
+#### LLM Judge Logging
+Added functionality to log outputs and results from the LLM judge during the verification process, improving traceability.
 
-*   **Gitea Branch Generator:** New backend agent supporting branch generation from Gitea repositories
-*   **GitHub Branch Generator:** New backend agent supporting branch generation from GitHub repositories
+*   **Verification Service:** Updated `orchestrator.py`, `code.py`, and `pipeline.py` to incorporate logging logic.
+*   **Documentation Update:** Added new guide documentation in `doc/screenshot/guide_image.md`.
 
-#### Scheduler Agent Integration
-Updates scheduler catalog to discover and manage new agents.
+#### Improved Documentation
+Updated the project's main README and CHANGELOG files to reflect recent changes.
 
-*   **Agent Discovery:** Modified scheduler/catalog.py to register new agent types
-*   **Executor Updates:** Updated agent_executor.py for new generator agents
-
-#### Frontend Agent Display
-Adds UI component for displaying Generator X agents in the Agents page.
-
-*   **Agents.jsx Component:** Added agent.jsx file and updated frontend display
-
-**Fixes & Bug Resolutions**
-
-*   **Scheduler Changelog Bug:** Fixed issue with scheduler adding changelogAgent
+*   **README Update:** Modified `README.md` with new information.
+*   **Changelog Entry:** Updated `CHANGELOG.md`.
 
 ---

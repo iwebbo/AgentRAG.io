@@ -1,5 +1,4 @@
-###A revoir adapter repo GITEA + name rag.io to agentrag et les autres vars en bas.
-
+#Default values for AgentRAG.io Helm chart
 nameOverride: ""
 fullnameOverride: ""
 
@@ -35,6 +34,14 @@ backend:
       value: "INFO"
     - name: WORKERS
       value: "4"
+    - name: VERIFY_MODE
+      value: "gate"
+    - name: VERIFY_JUDGE
+      value: "auto"
+    - name: VERIFY_MAX_ROUNDS
+      value: "2"
+    - name: RAG_MIN_SCORE
+      value: "0.25"
 
 # Scheduler worker
 scheduler:

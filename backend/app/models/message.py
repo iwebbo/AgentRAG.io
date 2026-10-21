@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -16,6 +16,7 @@ class Message(Base):
     reasoning_content = Column(Text, nullable=True)  # For Chain of Thought
     tokens_used = Column(Integer, nullable=True)
     latency_ms = Column(Integer, nullable=True)
+    verification = Column(JSON, nullable=True)  # verdict of the verification layer
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     
     # Relationships

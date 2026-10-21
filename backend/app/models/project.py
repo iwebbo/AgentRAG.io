@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Boolean, Float
+from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Boolean, Float, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -97,6 +97,7 @@ class RAGMessage(Base):
     retrieved_chunks = Column(Text, nullable=True)  # JSON des chunks utilisés
     tokens_used = Column(Integer, nullable=True)
     latency_ms = Column(Integer, nullable=True)
+    verification = Column(JSON, nullable=True)  # verdict of the verification layer
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     
     # Relationships

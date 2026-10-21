@@ -24,6 +24,11 @@ from app.services.llm_service import LLMService
 from app.services.provider_factory import ProviderFactory 
 from app.utils.security import decrypt_api_key 
 from app.utils.streaming import sse_generator, stream_manager
+from app.config import get_settings
+from app.services.verification import (
+    SSE_KEEPALIVE, VerificationContext, format_sse, run_verified_stream, status_payload, verdict_payload,
+)
+from app.services.verification_service import build_request_pipeline, effective_mode
 from app.schemas.rag_chat import RAGChatRequest, RAGChatResponse, RAGConversationResponse, RAGMessageResponse
 
 router = APIRouter(prefix="/api/rag", tags=["RAG Chat"])
@@ -697,29 +702,64 @@ async def rag_chat_stream(
             # Envoyer chunks
             yield f"event: retrieval\ndata: {json.dumps({'chunks': retrieved_chunks})}\n\n"
             
-            # Stream LLM
-            logger.info(f"🤖 Starting LLM stream with {request.provider_name}/{request.model}")
-            
-            async for chunk in llm_provider.stream_completion(
-                messages=messages,
-                model=request.model,
-                temperature=request.temperature
-            ):
-                full_response += chunk
-                yield f"event: message\ndata: {json.dumps({'content': chunk})}\n\n"
-            
-            # Sauvegarder réponse
-            assistant_message = RAGMessage(
-                conversation_id=conversation.id,
-                role="assistant",
-                content=full_response,
-                retrieved_chunks=json.dumps(retrieved_chunks)
+            # Stream LLM (+ vérification : off | annotate | gate)
+            mode = effective_mode(request.verify_mode)
+            logger.info(f"🤖 Starting LLM stream with {request.provider_name}/{request.model} (verify: {mode})")
+
+            pipeline = None
+            if mode != "off":
+                pipeline = build_request_pipeline(
+                    db, current_user.id, llm_provider, request.model, is_rag=True
+                )
+            ctx = VerificationContext(
+                question=request.message, retrieved_chunks=retrieved_chunks, is_rag=True
             )
-            db.add(assistant_message)
-            
-            conversation.updated_at = datetime.utcnow()
-            db.commit()
-            
+            settings = get_settings()
+
+            def open_stream(msgs):
+                return llm_provider.stream_completion(
+                    messages=msgs, model=request.model, temperature=request.temperature
+                )
+
+            assistant_message = None
+            async for event in run_verified_stream(
+                open_stream=open_stream,
+                messages=messages,
+                ctx=ctx,
+                pipeline=pipeline,
+                mode=mode,
+                max_rounds=settings.VERIFY_MAX_ROUNDS,
+                min_score=settings.VERIFY_MIN_SCORE,
+                keepalive_seconds=settings.VERIFY_KEEPALIVE_SECONDS,
+            ):
+                if event.kind == "token":
+                    yield f"event: message\ndata: {json.dumps({'content': event.data})}\n\n"
+                elif event.kind == "final":
+                    full_response = event.data
+                    # Sauvegarder réponse tout de suite (résiste à une déconnexion client)
+                    assistant_message = RAGMessage(
+                        conversation_id=conversation.id,
+                        role="assistant",
+                        content=full_response,
+                        retrieved_chunks=json.dumps(retrieved_chunks)
+                    )
+                    db.add(assistant_message)
+                    conversation.updated_at = datetime.utcnow()
+                    db.commit()
+                elif event.kind == "status":
+                    yield format_sse("status", status_payload(event.data))
+                elif event.kind == "keepalive":
+                    yield SSE_KEEPALIVE
+                elif event.kind == "verdict":
+                    if assistant_message is not None:
+                        try:
+                            assistant_message.verification = event.data.to_dict()
+                            db.commit()
+                        except Exception:
+                            logger.exception("Could not persist RAG verification verdict")
+                            db.rollback()
+                    yield format_sse("verdict", verdict_payload(event.data))
+
             logger.info(f"✅ RAG chat completed: {len(full_response)} chars")
             yield f"event: done\ndata: {json.dumps({'conversation_id': str(conversation.id)})}\n\n"
             

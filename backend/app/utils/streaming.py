@@ -5,6 +5,8 @@ from collections import deque
 from datetime import datetime
 import logging
 
+from app.services.verification import SSE_KEEPALIVE, StreamEvent, status_payload, verdict_payload
+
 logger = logging.getLogger(__name__)
 
 
@@ -99,6 +101,15 @@ async def sse_generator(
         full_content = ""
         
         async for chunk in content_generator:
+            # Verification events (status / verdict / keepalive) are not content.
+            if isinstance(chunk, StreamEvent):
+                if chunk.kind == "keepalive":
+                    yield SSE_KEEPALIVE
+                elif chunk.kind == "status":
+                    yield f"event: status\ndata: {json.dumps(status_payload(chunk.data))}\n\n"
+                elif chunk.kind == "verdict":
+                    yield f"event: verdict\ndata: {json.dumps(verdict_payload(chunk.data))}\n\n"
+                continue
             try:
                 # Update activity
                 await stream_manager.update_activity(stream_id)

@@ -1,9 +1,7 @@
 <img width="600" height="600" alt="agentragio" src="https://github.com/user-attachments/assets/93dfaf79-24a1-439b-9c63-724917a30554" />
 
 # AgentRAG.io
-**AgentRAG.io is a self-hosted, a RAG-Powered Intelligence, a MCP Integration, multi-provider platform featuring SSH & WinRM remote execution. It allows you to modularize your infrastructure and operational workflows by instantiating complex autonomous agents using a single file, scheduling basic task or Agent**
-
-[![.MD](https://img.shields.io/badge/Documentation-Example_of_Skills_.md-blue?style=for-the-badge&logo=markdown)](https://iwebbo.github.io/products/agentrag.html)
+**AgentRAG.io is a self-hosted, a RAG-Powered Intelligence, a MCP Integration, multi-provider platform featuring SSH & WinRM remote execution. It allows you to modularize your infrastructure and operational workflows by instantiating complex autonomous agents using a single file, scheduling basic task or Agent - with LLMJudge**
 
 ![License](https://img.shields.io/badge/MIT-00599C?style=for-the-badge&logo=MIT&logoColor=black)
 ![Python](https://img.shields.io/badge/Python-4EAA25?style=for-the-badge&logo=Python&logoColor=black)
@@ -12,13 +10,19 @@
 ![Docker](https://img.shields.io/badge/Docker-0078D6?style=for-the-badge&logo=Docker&logoColor=black)
 ![Opensearch](https://img.shields.io/badge/Opensearch-0078D6?style=for-the-badge&logo=Opensearch&logoColor=black)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-0078D6?style=for-the-badge&logo=ChromaDB&logoColor=black)
-
+![RAG](https://img.shields.io/badge/RAG-4A69BD?style=for-the-badge&logo=ChromaDB&logoColor=black)
+![Agents](https://img.shields.io/badge/Agents-2ECC71?style=for-the-badge&logo=ChromaDB&logoColor=black)
+![Scheduler](https://img.shields.io/badge/Scheduler-F39C12?style=for-the-badge&logo=ChromaDB&logoColor=black)
+![LLMJudge](https://img.shields.io/badge/LLMJudge-v0.0.1-0078D6?style=for-the-badge&logo=ChromaDB&logoColor=black)
+---
+[![Version](https://img.shields.io/badge/Version-v1.1.86-blue?style=for-the-badge&logo=github)](http://gitea.aecoding.local:3000/kiki/AgentRAG.io/releases/tag/v1.1.86)
 ---
 
 ## Overview
 
 AgentRAG.io extends RAG.io with autonomous MCP agents that combine RAG intelligence with external tool execution. Built for enterprises and developers who need AI that acts, not just answers.
 
+- **Answer verification (LLM judge)**: Every chat and RAG chat answer is checked before or after delivery: deterministic checks first (empty/truncated/looping output, `[SOURCE n]` citations, retrieval relevance, code via `ast` and `ruff`, JSON/YAML, expected schema), then an optional LLM judge that gets the sources and earlier findings as evidence and only blocks when confident. Three delivery modes: `off`, `annotate` (default: stream first, verdict after) and `gate` (buffer, verify, regenerate up to `VERIFY_MAX_ROUNDS` times, then deliver the best version). The verdict is returned as an SSE event and stored with the message.
 - **Scheduler**: Schedule existing agents (deterministic, fixed arguments) or simple LLM prompts on a cron-based frequency, with per-task approval modes (manual / auto / skip-all) and result delivery by in-app notification or email.
 - **Skill-Based Agents**: Instantiate any agent from a single .md file — define purpose, MCP servers, and RAG context in frontmatter YAML, register via API, run immediately.
 - **Remote Execution**: Operate Linux servers over SSH (Nginx, Apache, Docker, Kubernetes, PostgreSQL, MySQL) and Windows servers over WinRM (IIS, SQL Server, PowerShell) — credentials resolved securely from DB, never in plain config.
@@ -75,46 +79,14 @@ All the RAG.io features remain unchanged:
 
 ## Demo
 
-### 1. Agent Dashboard
-<img width="1916" height="912" alt="image" src="https://github.com/user-attachments/assets/0ca0ecbb-7be5-4872-b844-b272e2b80d15" />
-
-
-### 2. Code Generator Agent in Action
-<img width="1904" height="904" alt="Capture d&#39;écran 2026-06-23 234040" src="https://github.com/user-attachments/assets/18a67243-55af-4b68-9215-df45af3bac36" />
-<img width="1900" height="909" alt="Capture d&#39;écran 2026-06-23 234057" src="https://github.com/user-attachments/assets/929c2326-cd5d-4bbf-b129-665622d53509" />
-<img width="1901" height="907" alt="Capture d&#39;écran 2026-06-23 234408" src="https://github.com/user-attachments/assets/39eee5ce-ae25-42b8-b1a5-c0ba42091978" />
-
-### 3. Code Generator Agent in Action Commit & Create new Branch.
-<img width="1894" height="881" alt="image" src="https://github.com/user-attachments/assets/55b5871b-9dcd-40c6-8cba-9fd6e1b75ddf" />
-
-### 4. Code Review Agent in Action Pull request of Review.
-<img width="1918" height="850" alt="image" src="https://github.com/user-attachments/assets/1a7d26ea-8fa4-4bcb-af5d-36b19dc2a79b" />
-
-### 5. Scheduler - Basic Task & Agentic usage - Notification in app or email (success/failed) 
-<img width="1914" height="906" alt="image" src="https://github.com/user-attachments/assets/52300f8a-c736-4558-8077-c7464d9d8b46" />
-<img width="1914" height="907" alt="image" src="https://github.com/user-attachments/assets/2c2215ec-2a4c-43c8-a2f7-146e08543f82" />
-
-### 6. RAG Chat Interface (Original RAG.io)
-<img width="1913" height="907" alt="image" src="https://github.com/user-attachments/assets/930a83ee-29e9-4c14-8c89-1958a04d0d12" />
-
+[![.MD](https://img.shields.io/badge/Screenshot-AgentRAG.io-blue?style=for-the-badge&logo=markdown)](doc/screenshot/guide_image.md)
 ---
 
 ## MCP Servers
 
 MCP (Model Context Protocol) servers extend agent capabilities by providing structured tool access to external services. Declare servers in your agent config or `.md` frontmatter — the backend resolves credentials and routes tool calls automatically.
 
-| MCP Server | Key | Transport | Credential source | Tools |
-|-----------|-----|-----------|------------------|-------|
-| SSH | `ssh` | stdio | DB (encrypted) | `exec_command`, `get_system_info`, `upload_file`, `download_file`, `list_directory` |
-| WinRM | `winrm` | stdio | DB (encrypted) | `exec_powershell`, `get_system_info`, `restart_service`, `list_services`, `get_event_logs`, `get_running_processes`, `exec_cleanup` |
-| Gitea | `gitea` | HTTP | `mcp_config.gitea` | `clone_repository`, `get_repo_tree`, `get_file_content`, `update_file`, `commit_and_push`, `create_branch`, `create_pull_request` |
-| GitHub | `github` | HTTP | `mcp_config.github` | `get_file_content`, `update_file`, `create_pull_request`, `list_issues`, `create_review` |
-| DataGouv | `datagouv` | HTTP | none (public API) | `search_datasets`, `get_dataset`, `search_organizations`, `list_topics`, `get_topic` |
-| WikiJS | `wikijs` | HTTP | `mcp_config.wikijs` | `search_pages`, `get_page`, `create_page`, `update_page` |
-| SonarQube | `sonarqube` | HTTP | `mcp_config.sonarqube` (API token, Bearer → Basic auto-fallback) | `validate_auth`, `get_system_status`, `list_projects`, `get_project`, `list_branches`, `search_issues`, `fetch_all_issues`, `get_issue`, `get_issues_summary`, `list_security_hotspots`, `get_security_hotspot`, `get_rule`, `get_source_snippet`, `get_quality_gate`, `get_measures` |
-| Linter | `linter` | stdio | none | `lint_file`, `format_file`, `lint_directory`, `check_syntax` |
-| Test Runner | `test_runner` | stdio | none | `run_tests`, `run_single_test`, `get_coverage` |
-
+[![.MD](https://img.shields.io/badge/Documentation-MCP-blue?style=for-the-badge&logo=markdown)](doc/mcp/mcp_guide.md)
  
 ## Agentic - Agent
 
@@ -127,28 +99,8 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 - **Error Handling**: Automatic retries, timeouts, and graceful degradation
 - **Token Tracking**: Monitor LLM usage and MCP call counts
 
-#### **Agent Types Available**
-
-| Agent | `agent_type` | Use Case | MCP Servers | RAG Context |
-|-------|-------------|----------|-------------|-------------|
-| **Code Generator** | `code_generator` | Generate code from natural language | GitHub, Linter, Test Runner | Repository docs |
-| **Branch Code Review** | `branch_code_review` | Automated PR review with suggestions | GitHub | Coding standards |
-| **Legal Advisor** | `legal_fiscal` | Contract analysis, compliance checks | — | Legal database |
-| **Accounting Advisor** | `accounting_finance` | Financial analysis, invoice processing | — | Accounting rules |
-| **Web Search** | `websearch` | Real-time web search & synthesis | — | — |
-| **Travel Expert** | `travel_expert` | Trip planning, itinerary management | — | Travel knowledge |
-| **Email Expert** | `email_expert` | Draft, analyse and send emails via LLM | — | — |
-| **Gitea Code Generator** | `gitea_code_generator` | fixed | `gitea`, `linter` | Generate code, lint, commit and PR on self-hosted Gitea |
-| **Gitea Ansible Role Generator** | `gitea_ansible_role_generator` | fixed | `gitea`, `linter` | Generate Role Ansible, lint, commit and PR on self-hosted Gitea |
-| **Git Ansible Role Generator** | `ansible_role_generator` | fixed | `git`, `linter` | Generate Role Ansible, lint, commit and PR on self-hosted GitHub |
-| **DataGouv Explorer** | `datagouv_explorer` | fixed | `datagouv` | Search and explore the French open data catalogue |
-| **WikiJS Assistant** | `wikijs` | fixed | `wikijs` | Search, read, create and update Wiki.js documentation pages via LLM |
-| **SSH Agent** | `skill` (.md) | Remote command execution on Linux/Unix hosts | SSH (DB-aware) | — |
-| **WinRM Agent** | `skill` (.md) | Remote PowerShell execution on Windows hosts | WinRM (DB-aware) | — |
-| **Skill Agent** | `skill` | Any custom agent defined via `.md` frontmatter | Any registered MCP | Any project |
-| **SonarQube Security** | `sonarqube` | Projects inventory, vulnerabilities, security hotspots, quality gate, and LLM-assisted remediation (modes: `projects`, `overview`, `issues`, `hotspots`, `remediate`) | `sonarqube` | Optional — repository project (`use_rag: true` + `project_id`) |
-
-| *(Custom)* | `skill` | Build your own specialized agent | Any MCP server | Any project |
+[![.MD](https://img.shields.io/badge/Documentation-Agents-blue?style=for-the-badge&logo=markdown)](doc/agents/agent_guide.md)
+[![.MD](https://img.shields.io/badge/Documentation-Example_of_skill_md-blue?style=for-the-badge&logo=markdown)](doc/agents/skill_agent.md)
 
 ---
 
@@ -179,7 +131,7 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 
 > **Helm Chart + Documentation**
 
-[ **Documentation Kubernetes officiel** →](https://iwebbo.github.io/AgentRAG.io/)
+[![.MD](https://img.shields.io/badge/Documentation-Kubernetes-blue?style=for-the-badge&logo=markdown)](https://iwebbo.github.io/AgentRAG.io/)
 
 ### ☸️ **Quick Start with Docker**
 
@@ -238,6 +190,10 @@ docker run -d \
   -e SMTP_STARTTLS="true" \
   -e SMTP_USE_SSL="false" \
   -e SMTP_VERIFY_CERT="true" \
+  -e VERIFY_MODE="gate" \
+  -e VERIFY_JUDGE="auto" \
+  -e VERIFY_MAX_ROUNDS="2" \
+  -e RAG_MIN_SCORE="0.25" \
   ghcr.io/iwebbo/agentrag.io/backend:latest
 ```
 
@@ -252,527 +208,7 @@ docker run -d \
 
 ---
 
-## Available Agents
-
-### 1. Code Generator Agent
-
-**Purpose**: Generate production-ready code from natural language prompts with automatic testing and quality checks.
-
-**Workflow**:
-1. Fetch entire repository via GitHub MCP
-2. Embed code files into RAG project (if not already done)
-3. Retrieve relevant code context via semantic search
-4. Generate code using LLM with context
-5. Run tests automatically (pytest, jest, junit)
-6. Lint and format code (flake8, eslint, prettier)
-7. Commit changes to new branch
-8. Optionally create Pull Request
-
-**Configuration**:
-```json
-{
-  "project_id": "uuid",
-  "mcp_servers": ["github", "test_runner", "linter"],
-  "repo": "owner/repo",
-  "target_branch": "ai-feature",
-  "base_branch": "main",
-  "auto_test": true,
-  "auto_lint": true,
-  "auto_commit": true,
-  "auto_create_pr": false,
-  "test_framework": "auto",  // pytest|jest|junit|auto
-  "language": "auto"  // python|javascript|typescript|auto
-}
-```
-
-**Input**:
-```json
-{
-  "prompt": "Add OAuth2 authentication with JWT tokens",
-  "target_files": ["backend/auth.py", "backend/middleware.py"],
-  "create_new_files": true,
-  "test_mode": true,
-  "commit_message": "feat: add OAuth2 authentication"
-}
-```
-
-**Output** (streaming):
-```json
-{"type": "log", "data": {"message": "Fetching repository...", "level": "info"}}
-{"type": "log", "data": {"message": "Retrieved 12 relevant code files from RAG", "level": "info"}}
-{"type": "progress", "data": {"step": "generating_code", "percent": 30}}
-{"type": "log", "data": {"message": "Generated 234 lines of code", "level": "info"}}
-{"type": "log", "data": {"message": "Running tests...", "level": "info"}}
-{"type": "log", "data": {"message": "✅ All 15 tests passed", "level": "success"}}
-{"type": "result", "data": {"files_created": ["backend/auth.py"], "tests_passed": 15}}
-```
-
-**Use Cases**:
-- Feature development from natural language specs
-- Refactoring large codebases with context awareness
-- Automated bug fixes with test coverage
-- API endpoint generation with documentation
-
----
-
-### 2. Branch Code Review Agent
-
-**Purpose**: Automated PR review with intelligent suggestions based on coding standards and best practices.
-
-**Workflow**:
-1. Fetch PR details via GitHub MCP
-2. Retrieve coding standards from RAG project
-3. Analyze changed files with LLM + context
-4. Generate review comments
-5. Post comments to PR via GitHub MCP
-6. Optionally approve/request changes
-
-**Configuration**:
-```json
-{
-  "project_id": "uuid",  // Project with coding standards docs
-  "mcp_servers": ["github"],
-  "repo": "owner/repo",
-  "review_style": "constructive",  // constructive|strict|minimal
-  "auto_approve": false,
-  "check_tests": true,
-  "check_coverage": true
-}
-```
-
-**Input**:
-```json
-{
-  "pr_number": 123,
-  "focus_areas": ["security", "performance", "testing"]
-}
-```
-
-**Use Cases**:
-- Automated first-pass PR reviews
-- Enforce coding standards consistently
-- Catch security vulnerabilities early
-- Reduce manual review load
-
----
-
-### 3. Legal Advisor Agent
-
-**Purpose**: Contract analysis, compliance checks, and legal document generation.
-
-**Workflow**:
-1. Retrieve contract templates and legal precedents from RAG
-2. Analyze uploaded contracts via LLM
-3. Identify compliance issues
-4. Generate redlined versions
-5. Suggest improvements
-
-**Configuration**:
-```json
-{
-  "project_id": "uuid",  // Project with legal docs
-  "mcp_servers": ["document_storage"],
-  "jurisdiction": "US",
-  "focus_areas": ["gdpr", "data_privacy", "intellectual_property"]
-}
-```
-
-**Use Cases**:
-- NDA review and generation
-- GDPR compliance audits
-- Contract risk assessment
-- Legal clause recommendations
-
----
-
-### 4. Accounting Advisor Agent
-
-**Purpose**: Financial analysis, invoice processing, and regulatory compliance.
-
-**Workflow**:
-1. Retrieve accounting rules and regulations from RAG
-2. Process financial documents via LLM
-3. Generate reports and insights
-4. Flag compliance issues
-5. Suggest corrective actions
-
-**Configuration**:
-```json
-{
-  "project_id": "uuid",  // Project with accounting docs
-  "mcp_servers": ["erp_integration"],
-  "accounting_standard": "GAAP",  // GAAP|IFRS
-  "tax_jurisdiction": "US"
-}
-```
-
-**Use Cases**:
-- Invoice validation and processing
-- Financial statement analysis
-- Tax compliance checks
-- Expense categorization
-
----
-
-### 5. SSH Agent — Linux Server Monitoring
-
-**Purpose**: Operate and monitor Linux servers via natural language. Covers Apache/Nginx web server management, Kubernetes node inspection, Docker container lifecycle, PostgreSQL/MySQL health checks, log analysis, disk/CPU/memory diagnostics, zero-downtime deployments, and automated incident remediation — all executed through SSH without leaving your chat interface.
-
-**Use Cases**:
-"nginx is returning 502 on prod-web-01, check error logs and reload config"
-"list all pods in CrashLoopBackOff on the k8s node"
-"rotate logs on all app servers and check disk space after"
-"restart the PostgreSQL service and verify replication lag"
-"deploy the latest Docker image to staging and confirm the container is healthy"
-"check Apache virtual hosts config and test syntax before reload"
-"analyze the last 100 lines of /var/log/syslog for OOM kills"
-
-**Workflow**:
-1. Create host Linux / Windows
-2. Create .md skills
-3. Upload & Import
-4. Run Agent
-
-**Host**:
-```bash
-{
-# SSH par clé privée
-POST /api/hosts
-{
-  "name": "prod-web-01",
-  "protocol": "ssh",
-  "host": "192.168.1.10",
-  "port": 22,
-  "username": "deploy",
-  "credential_type": "key",
-  "key_content": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
-  "key_passphrase": "optional_passphrase",
-  "tags": ["production", "web"],
-  "notes": "Web server prod cluster A"
-}
-
-# OU SSH par mot de passe
-POST /api/hosts
-{
-  "name": "prod-web-01",
-  "protocol": "ssh",
-  "host": "192.168.1.10",
-  "port": 22,
-  "username": "deploy",
-  "credential_type": "password",
-  "password": "s3cur3p4ss",
-  "tags": ["production", "web"]
-}
-```
-**Skill**:
-
-```bash
-POST /api/skills/register
-Content-Type: multipart/form-data
-
-file=@linux_server_agent.md
-auto_create_agent=true
-llm_provider=ollama
-llm_model=llama3.1
-```
-
-```md
-skill_id: k8s_ops
-type: agent
-mcp_servers: [ssh]
-description: "Ops noeuds Kubernetes via kubectl"
-tags: [kubernetes,k8s,kubectl,ssh]
----
-## Mapping
-- pods             → kubectl get pods -A
-- logs <pod>       → kubectl logs <pod> --tail=50
-- describe <pod>   → kubectl describe pod <pod>
-- nodes            → kubectl get nodes -o wide
-- drain <node>     → kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
-- events           → kubectl get events --sort-by=.lastTimestamp -A | tail -20
-## Format
-✅ Succès | ⚠️ Warning | ❌ Erreur + stderr + fix
-```
-
-### Linux SSH Agents
- 
-| Skill | Purpose |
-|-------|---------|
-| `nginx_ops` | Manage Nginx — config test, reload, log analysis, upstream health, SSL expiry check |
-| `apache_ops` | Manage Apache — VHost management, mod_status, graceful restart, SSL, access log analysis |
-| `kubernetes_node_ops` | Inspect Kubernetes — pod triage, CrashLoopBackOff diagnosis, node drain, rolling restarts, rollback |
-| `docker_ops` | Operate Docker — container lifecycle, image pull, health checks, Compose redeploy, prune |
-| `postgres_ops` | Monitor PostgreSQL — replication lag, slow queries, lock contention, bloat, backup status |
-| `mysql_ops` | Monitor MySQL/MariaDB — processlist, replica lag, slow log, InnoDB metrics, backup check |
-| `linux_incident` | Triage Linux incidents — CPU/memory/disk pressure, OOM kills, systemd failures, network saturation |
-| `log_analyzer` | Analyse any log — grep/awk/tail, error patterns, log rotation, SFTP download |
-| `deploy_rollback` | Deploy & rollback — git pull, build, service restart, health check, auto-rollback on failure |
-
-
----
-
-### 6. WinRM Agent — Windows Server Operations
-
-**Purpose**: Financial analysis, invoice processing, and regulatory compliance.
-
-**Workflow**:
-1. Create host Linux / Windows
-2. Create .md skills
-3. Upload & Import
-4. Run Agent
-
-**Host**:
-```bash
-# WinRM NTLM 
-POST /api/hosts
-{
-  "name": "win-srv-01",
-  "protocol": "winrm",
-  "host": "10.0.0.20",
-  "port": 5985,
-  "username": "Administrator",
-  "credential_type": "ntlm",
-  "password": "W1nd0wsP4ss!",
-  "domain": "CORP",
-  "winrm_transport": "ntlm",
-  "winrm_server_cert_validation": "ignore",
-  "tags": ["windows", "production", "iis"],
-  "notes": "IIS production server"
-}
-
-# WinRM HTTPS (port 5986 + cert)
-POST /api/hosts
-{
-  "name": "win-srv-01-secure",
-  "protocol": "winrm",
-  "host": "10.0.0.20",
-  "port": 5986,
-  "username": "Administrator",
-  "credential_type": "ntlm",
-  "password": "W1nd0wsP4ss!",
-  "winrm_transport": "ntlm",
-  "winrm_server_cert_validation": "validate",
-  "tags": ["windows", "production"]
-}
-```
-**Skill**:
-
-```bash
-POST /api/skills/register
-Content-Type: multipart/form-data
-
-file=@windows_server_agent.md
-auto_create_agent=true
-llm_provider=ollama
-llm_model=llama3.1
-```
-
-```md
-skill_id: windows_server_ops
-type: agent
-description: "Operates Windows servers via WinRM — PowerShell execution, IIS management, event logs, service control"
-mcp_servers: [winrm]
-tags: [winrm, windows, powershell, iis, ops]
-version: "1.0"
-project_required: false
----
-
-## Purpose
-Operate and monitor Windows servers via WinRM/PowerShell.
-Manage IIS, Windows Services, event logs, processes, and run arbitrary PowerShell.
-
-## Workflow
-1. Identify the target host from the request
-2. Call `get_system_info` on first contact to collect OS/hardware context
-3. Execute PowerShell scripts or built-in methods as needed
-4. Parse JSON output and build a structured report
-5. Suggest corrective actions for any detected issues
-
-## Available MCP Tools (WinRM)
-
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `exec_powershell` | `host`, `script` | Run arbitrary PowerShell — returns stdout/stderr/exit_code |
-| `exec_cmd` | `host`, `cmd`, `args[]?` | Run a classic cmd.exe command |
-| `check_service` | `host`, `service` | Get Windows service status (JSON) |
-| `restart_service` | `host`, `service` | Restart a Windows service |
-| `start_service` | `host`, `service` | Start a Windows service |
-| `stop_service` | `host`, `service` | Stop a Windows service |
-| `get_event_logs` | `host`, `log_name?`, `level?`, `count?` | Query Windows Event Logs |
-| `get_system_info` | `host` | Collect OS/CPU/RAM/disk info (persisted in DB) |
-| `get_running_processes` | `host`, `top_n?` | Top N processes by memory usage |
-| `list_services` | `host`, `status?` | List all/filtered Windows services |
-| `exec_cleanup` | `host` | Clean temp files + force GC |
-
-## Instructions
-
-**Check IIS status and restart if needed:**
-check_service:   host=<name> service=W3SVC
-restart_service: host=<name> service=W3SVC
-
-## Output Format
-Always return:
-- **Host**: name + resolved IP
-- **OS**: Windows version from `get_system_info`
-- **Status**: OK / WARNING / CRITICAL
-- **Findings**: anomalies or relevant state
-- **Actions taken**: each method called + result summary
-- **Recommendations**: next steps or escalation path
-```
-
-### Windows WinRM Agents
- 
-| Skill | Purpose |
-|-------|---------|
-| `iis_ops` | Manage IIS — app pool lifecycle, site bindings, SSL certificates, access log analysis, FREB |
-| `windows_incident` | Triage Windows incidents — CPU/memory/disk pressure, event log errors, stuck processes, service failures |
-| `sqlserver_ops` | Monitor SQL Server — blocking queries, AG replication lag, failed jobs, index fragmentation, backup status |
-| `windows_deploy_rollback` | Deploy & rollback — robocopy staging, app pool recycle, health check, auto-rollback, backup snapshots |
-| `windows_log_analyzer` | Analyse Windows logs — Event Log queries, failed logins, lockouts, IIS W3C logs, custom app logs |
- 
----
-
-## Opensearch Guide
-
-IMPORTANT : AgentRAG.io need to have some prerequesite to use it. 
-
-**Documentation**:
-- Example of create index with mandatory field 
-- Example of workflow add data into Opensearch index using DocVector and ask with AgentRAG.IO
-- Example of workflow add data into Openserach index using an external API and upload with DocVector and ask to AgentRAG.io 
-
-### 1. Opensearch Mandatory Field Create index
-
-- "embedding": ## Mandatory field to have
-
-```bash
-curl -k -X PUT "https://opensearch.local:9200/index-example" \
--u 'user:pwd' \
--H 'Content-Type: application/json' \
--d '{
-  "settings": {
-    "index": {
-      "knn": true,
-      "knn.algo_param.ef_search": 100
-    }
-  },
-  "mappings": {
-    "properties": {
-      "embedding": {
-        "type": "knn_vector",
-        "dimension": 384,
-        "method": {
-          "name": "hnsw",
-          "space_type": "cosinesimil",
-          "engine": "lucene"
-        }
-      },
-      "text_content": { "type": "text" },
-      "source_doc": { "type": "keyword" }
-    }
-  }
-}'
-```
-
-- "metadata": ## Mandatory structure to have and field
-
-```bash
-#Syntax mandatory to have for AgentRAG.io ingestion Opensearch data/index.
-#Example : 
-
-    doc_id = f"{category}-{mac.replace(':', '')}"
-    doc = {
-        "chunk_id": doc_id,
-        "content": content_text,
-        "embedding": embedding,
-        "title": f"Host: {name}",
-        "metadata": {
-            "source_type": "source_api",
-            "ip": ip,
-            "mac": mac,
-            "is_active": is_active,
-            "category": category,
-            "created_at": datetime.utcnow().isoformat()
-        }
-    }
-```
-
----
-
-### 2. Workflow upload/add data for Opensearch index using DocVector.io 
-
-DocVector.io : https://github.com/iwebbo/DocVector 
-
-```bash
-git clone https://github.com/iwebbo/DocVector.git
-
-- Install it 
-- Use it 
-
-```
-
-```text
-Step1 : Upload fichiers      Step2 : Ingestion         Step3 : RAG Queries
-        ↓                              ↓                          ↓
-┌───────────────────┐       ┌───────────────────┐      ┌──────────────────┐
-│  DocVector GUI    │       │  OpenSearch       │      │  AgentRAG.io     │
-│                   │       │  Vector Index     │      │                  │
-│  [Drop Files]     │──────▶│  knowledge_base   │◀─────│  [Ask Questions] │
-│                   │       │                   │      │                  │
-└───────────────────┘       └───────────────────┘      └──────────────────┘
-```
-
----
-
-### 3. Workflow upload/add data for Opensearch index using script example and upload/ingest from DocVector API
-
-DocVector.io : https://github.com/iwebbo/DocVector 
-
-```bash
-git clone https://github.com/iwebbo/DocVector.git
-
-- Install it 
-- Use API to Upload/Ingest data to Opensearch Index. 
-
-```
-
-Extraction API to Markdown file 
-```bash
-curl -s https://api.local/inventory \
-  -H "Authorization: Bearer TOKEN" | \
-  jq -r '"# Infrastructure Inventory\n\n" + 
-    (.servers[] | "## " + .name + "\n- IP: " + .ip + "\n- Status: " + .status + "\n\n")' \
-  > infrastructure.md
-```
-
-Example of data 
-```bash
-# Infrastructure Inventory
-## server-01
-- IP: 10.0.1.10
-- Status: active
-
-## server-02
-- IP: 10.0.1.11
-- Status: active
-```
-
-Upload markdown file to DocVector API
-```bash
-curl -k -X POST https://docvector.local/api/upload \
-  -F "files[]=@infrastructure.md"
-```
-
-Ingest into Opensearch with DocVector API
-```bash
-curl -k -X POST https://docvector.local/api/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"recreate": false, "auto_cleanup": true}'
-```
-
----
-
-## 📄 License
+## License
 
 This project is licensed under the **MIT License**. See [LICENSE](LICENSE) file for details.
 
