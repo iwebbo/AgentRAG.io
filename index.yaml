@@ -2,10 +2,10 @@ apiVersion: v1
 entries:
   agentragio:
   - apiVersion: v2
-    appVersion: 1.1.84
-    created: "2026-10-19T13:08:37.496727171Z"
+    appVersion: 1.1.86
+    created: "2026-10-21T21:46:33.97782791Z"
     description: AgentRAG.io - Retrieval-Augmented Generation & MCP Agent
-    digest: 65d0e23546a6e19f4103a84fb1a2ad8b196d1524042bbcde133fe5299045961f
+    digest: 199a193cf4f2811e1f45521aa2d2ec3ab2735033ecfa0da825bd91b8f813b2d8
     home: https://github.com/iwebbo/AgentRAG.io
     keywords:
     - rag
@@ -21,6 +21,6 @@ entries:
     - https://github.com/iwebbo/AgentRAG.io
     type: application
     urls:
-    - https://iwebbo.github.io/AgentRAG.io/agentragio-1.1.84.tgz
-    version: 1.1.84
-generated: "2026-10-19T13:08:37.495492094Z"
+    - https://iwebbo.github.io/AgentRAG.io/agentragio-1.1.86.tgz
+    version: 1.1.86
+generated: "2026-10-21T21:46:33.976701144Z"
