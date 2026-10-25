@@ -15,7 +15,7 @@
 ![Scheduler](https://img.shields.io/badge/Scheduler-F39C12?style=for-the-badge&logo=ChromaDB&logoColor=black)
 ![LLMJudge](https://img.shields.io/badge/LLMJudge-v0.0.1-0078D6?style=for-the-badge&logo=ChromaDB&logoColor=black)
 ---
-[![Version](https://img.shields.io/badge/Version-v1.1.86-blue?style=for-the-badge&logo=github)](http://gitea.aecoding.local:3000/kiki/AgentRAG.io/releases/tag/v1.1.86)
+[![Version](https://img.shields.io/badge/Version-v1.1.86-blue?style=for-the-badge&logo=github)](https://github.com/iwebbo/AgentRAG.io/releases/tag/v1.1.86)
 ---
 
 ## Overview
