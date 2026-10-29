@@ -705,6 +705,174 @@ class SGLangProvider(OpenAIProvider):
         except Exception:
             return ["meta-llama/Llama-3.1-8B-Instruct"]
 
+
+class LlamaCppProvider(OpenAIProvider):
+    """llama.cpp llama-server - OpenAI-compatible (/health, /v1/models, /v1/chat/completions)"""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: str = "http://127.0.0.1:8080/v1",
+        config: Optional[Dict[str, Any]] = None
+    ):
+        base_url = (base_url or "http://127.0.0.1:8080/v1").rstrip("/")
+        if not base_url.endswith("/v1"):
+            base_url = f"{base_url}/v1"
+        super().__init__(api_key or "llamacpp", base_url, config)
+        self.root_url = base_url[:-3]  # sans /v1, pour /health
+        self.client = openai.AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=httpx.Timeout(600.0, connect=10.0),  # modèles reasoning : longues générations
+            max_retries=1
+        )
+        self._model_cache: Optional[str] = None
+
+    async def _resolve_model(self, model: Optional[str]) -> str:
+        """Single-model server : si model vide/inconnu → premier modèle exposé par /v1/models"""
+        if self._model_cache is None:
+            models = await self.get_available_models()
+            self._model_cache = models[0] if models else "default"
+        if not model or model in ("default", "gpt-4-turbo-preview"):
+            return self._model_cache
+        return model
+
+    async def stream_completion(
+        self,
+        messages: list,
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        show_reasoning = self.config.get("show_reasoning", False)
+        try:
+            model = await self._resolve_model(model)
+            stream = await self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                stream=True,
+                **kwargs
+            )
+            in_think = False
+            async for chunk in stream:
+                if not chunk.choices:  # chunk usage/timings final
+                    continue
+                delta = chunk.choices[0].delta
+
+                reasoning = getattr(delta, "reasoning_content", None) \
+                    or (getattr(delta, "model_extra", None) or {}).get("reasoning_content")
+                if reasoning and show_reasoning:
+                    if not in_think:
+                        in_think = True
+                        yield "<think>"
+                    yield reasoning
+
+                if delta.content:
+                    if in_think:
+                        in_think = False
+                        yield "</think>"
+                    yield delta.content
+
+            if in_think:
+                yield "</think>"
+
+        except openai.APIError as e:
+            raise Exception(f"llama-server API error: {getattr(e, 'message', str(e))}")
+        except Exception as e:
+            raise Exception(f"llama-server streaming error: {str(e)}")
+
+    async def test_connection(self) -> tuple[bool, str, Optional[int]]:
+        try:
+            start = time.time()
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                r = await client.get(f"{self.root_url}/health")
+                if r.status_code == 503:
+                    return False, "llama-server: model loading...", None
+                r.raise_for_status()
+            models = await self.get_available_models()
+            latency = int((time.time() - start) * 1000)
+            if not models:
+                return False, "llama-server up but no model exposed", latency
+            return True, f"llama-server OK • {models[0]}", latency
+        except Exception as e:
+            return False, f"llama-server error: {str(e)}", None
+
+    async def get_available_models(self) -> List[str]:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                r = await client.get(
+                    f"{self.base_url}/models",
+                    headers={"Authorization": f"Bearer {self.api_key}"}
+                )
+                r.raise_for_status()
+                data = r.json().get("data", [])
+                return [m["id"] for m in data if isinstance(m, dict) and "id" in m]
+        except Exception as e:
+            print(f"[llama.cpp] Unable to fetch models: {e}")
+            return []
+
+
+class InternaLLMProvider(OpenAIProvider):
+    """
+    Implémentation d'un fournisseur de modèles basé sur le protocole OpenAI.
+    """
+
+    def __init__(
+            self, 
+            api_key: str, 
+            base_url: str = "https://api.local/v1/openai", 
+            config: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(api_key=api_key, base_url=base_url, config=config)
+
+    async def stream_completion(
+        self, 
+        messages: list, 
+        model: str = "gpt-4-turbo-preview",
+        temperature: float = 0.7,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        try:
+            stream = await self.client.chat.completions.create(
+                model=model, 
+                messages=messages, 
+                temperature=temperature, 
+                stream=True,
+                **kwargs
+            )
+
+            async for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+
+                    if hasattr(delta, 'content') and delta.content is not None:
+                        yield delta.content
+
+        except openai.APIError as e:
+            raise Exception(f"API error: {e}")
+        except Exception as e:
+            raise Exception(f"Streaming error: {str(e)}")
+
+
+    async def test_connection(self) -> tuple[bool, str, Optional[int]]:
+        try:
+            start_time = asyncio.get_event_loop().time() 
+            response = await self.client.models.list()
+            latency = int((asyncio.get_event_loop().time() - start_time) * 1000)
+            return True, f"OK • {len(response.data)} model(s)", latency
+        except Exception as e:
+            return False, f"Connection failed: {str(e)}", None
+
+    async def get_available_models(self) -> List[str]:
+        try:
+            response = await self.client.models.list()
+            return [model.id for model in response.data]
+        except Exception as e:
+            print(f"Warning: Could not retrieve models list: {e}") 
+            return []
+
+
 class ProviderFactory:
     """Factory to create LLM providers"""
     
@@ -732,13 +900,15 @@ class ProviderFactory:
             "groq": GroqProvider,
             "grok": GrokProvider,
             "sglang": SGLangProvider,
+            "llamacpp": LlamaCppProvider,
+            "internalLLMProvider": InternaLLMProvider,
         }
         
         provider_class = providers.get(provider_name.lower())
         if not provider_class:
             raise ValueError(f"Unknown provider: {provider_name}")
         
-        if provider_name.lower() in ["ollama", "lmstudio", "localai", "lmdeploy", "oobabooga", "vllm", "sglang"]:
+        if provider_name.lower() in ["ollama", "lmstudio", "localai", "lmdeploy", "oobabooga", "vllm", "sglang","llamacpp"]:
             return provider_class(api_key=api_key, base_url=base_url or provider_class.__init__.__defaults__[1], config=config)
         else:
             if not api_key:

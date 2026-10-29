@@ -1,23 +1,27 @@
 # AgentRAG.io Changelog
 
-## Version v1.1.86 - [21/10/2026]
+## Version v1.1.90 - [29/10/2026]
 
-This release introduces logging capabilities for the LLM judge within the verification service. Several backend components were updated alongside new documentation.
+This update introduces support for multiple new service providers and integrates LlamaServer functionality into the system.
 
 ---
 
 ### New Features & Enhancements
 
-#### LLM Judge Logging
-Added functionality to log outputs and results from the LLM judge during the verification process, improving traceability.
+#### Expanded Provider Support
+The backend factory and frontend components have been updated to incorporate several new provider options, enhancing connectivity.
 
-*   **Verification Service:** Updated `orchestrator.py`, `code.py`, and `pipeline.py` to incorporate logging logic.
-*   **Documentation Update:** Added new guide documentation in `doc/screenshot/guide_image.md`.
+*   **New providers added:** Multiple new service providers were integrated into the system.
+*   **Updated provider logic:** The `provider_factory.py` was significantly updated to handle expanded provider configurations.
 
-#### Improved Documentation
-Updated the project's main README and CHANGELOG files to reflect recent changes.
+#### LlamaServer Integration
+New C++ files were added to support LlamaServer functionality, improving local model serving capabilities.
 
-*   **README Update:** Modified `README.md` with new information.
-*   **Changelog Entry:** Updated `CHANGELOG.md`.
+*   **Added llamaserver.cpp:** The core logic for `llamaserver.cpp` was implemented and added to the codebase.
+*   **Frontend integration:** Changes were made in the frontend to support LlamaServer features.
+
+**Fixes & Bug Resolutions**
+
+*   **JudgeLLM value fix:** Corrected a change value issue related to JudgeLLM functionality.
 
 ---

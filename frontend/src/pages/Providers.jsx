@@ -21,6 +21,8 @@ const PROVIDER_CONFIG = [
   { value: 'vllm',        label: 'vLLM',                          category: 'local', requiresKey: false, defaultUrl: 'http://localhost:8000/v1' },
   { value: 'lmdeploy',    label: 'LMDeploy / OpenXLab',           category: 'local', requiresKey: false, defaultUrl: 'http://localhost:23333/v1' },
   { value: 'sglang',      label: 'SGLang',                        category: 'local', requiresKey: false, defaultUrl: 'http://localhost:30000/v1' },
+  { value: 'llamacpp',    label: 'llama.cpp (llama-server)',      category: 'local', requiresKey: false, defaultUrl: 'http://127.0.0.1:8080/v1' },
+  { value: 'internalLLMProvider',      label: 'internalLLMProvider',                        category: 'local', requiresKey: true,  defaultUrl: null,                                   keyHint: 'token-...' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

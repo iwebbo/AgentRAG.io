@@ -128,12 +128,12 @@ def notify_terminal(db, run_id: UUID) -> None:
         if run.status == "success":
             if notify_on not in ("always", "success"):
                 return
-            type_, title = "task_result", f"✅ {task.name}"
+            type_, title = "task_result", f"[AgentRAG.io - Scheduler] {task.name}"
             body = run.result_text or "(no output)"
         elif run.status == "failed":
             if notify_on not in ("always", "failure"):
                 return
-            type_, title = "task_failed", f"❌ {task.name} failed"
+            type_, title = "task_failed", f"[AgentRAG.io - Scheduler] {task.name} failed"
             body = f"**{task.name}** failed.\n\n{run.error or 'Unknown error'}"
         elif run.status == "expired":
             type_, title = "task_failed", f"⏱ Approval expired: {task.name}"
@@ -175,7 +175,7 @@ def _notify_approval(db, run: ScheduledTaskRun, task: ScheduledTask, user: User,
             db,
             user=user,
             type_="approval_required",
-            title=f"🔐 Approval required: {task.name}",
+            title=f"Approval required: {task.name}",
             body_md=body,
             run_id=run.id,
             channels=task.notify_channels or ["in_app"],
