@@ -12,7 +12,7 @@ backend:
   name: backend
   image:
     repository: ghcr.io/iwebbo/AgentRAG.io/backend
-    tag: "1.1.90"
+    tag: "1.1.91"
     pullPolicy: IfNotPresent
   replicas: 2
   service:
@@ -66,7 +66,7 @@ frontend:
   name: frontend
   image:
     repository: ghcr.io/iwebbo/AgentRAG.io/frontend
-    tag: "1.1.90"
+    tag: "1.1.91"
     pullPolicy: IfNotPresent
   replicas: 2
   service:
