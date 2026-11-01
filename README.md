@@ -15,7 +15,7 @@
 ![Scheduler](https://img.shields.io/badge/Scheduler-F39C12?style=for-the-badge&logo=ChromaDB&logoColor=black)
 ![LLMJudge](https://img.shields.io/badge/LLMJudge-v0.0.1-0078D6?style=for-the-badge&logo=ChromaDB&logoColor=black)
 ---
-[![Version](https://img.shields.io/badge/Version-v1.1.86-blue?style=for-the-badge&logo=github)](https://github.com/iwebbo/AgentRAG.io/releases/tag/v1.1.86)
+[![Version](https://img.shields.io/badge/Version-v1.1.90-green?style=for-the-badge&logo=github)](http://gitea.aecoding.local:3000/kiki/AgentRAG.io/releases/tag/v1.1.90)
 ---
 
 ## Overview
@@ -79,14 +79,16 @@ All the RAG.io features remain unchanged:
 
 ## Demo
 
-[![.MD](https://img.shields.io/badge/Screenshot-AgentRAG.io-blue?style=for-the-badge&logo=markdown)](doc/screenshot/guide_image.md)
----
+[![Demo Badge](https://img.shields.io/badge/Screenshot-AgentRAG.io-blue?style=for-the-badge&logo=markdown)](doc/screenshot/guide_image.md)
+
 
 ## MCP Servers
 
 MCP (Model Context Protocol) servers extend agent capabilities by providing structured tool access to external services. Declare servers in your agent config or `.md` frontmatter — the backend resolves credentials and routes tool calls automatically.
 
-[![.MD](https://img.shields.io/badge/Documentation-MCP-blue?style=for-the-badge&logo=markdown)](doc/mcp/mcp_guide.md)
+> **Documenatation of MCP Guide** :
+
+[![MCP Badge](https://img.shields.io/badge/Documentation-MCP-red?style=for-the-badge&logo=markdown)](doc/mcp/mcp_guide.md)
  
 ## Agentic - Agent
 
@@ -99,8 +101,13 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 - **Error Handling**: Automatic retries, timeouts, and graceful degradation
 - **Token Tracking**: Monitor LLM usage and MCP call counts
 
-[![.MD](https://img.shields.io/badge/Documentation-Agents-blue?style=for-the-badge&logo=markdown)](doc/agents/agent_guide.md)
-[![.MD](https://img.shields.io/badge/Documentation-Example_of_skill_md-blue?style=for-the-badge&logo=markdown)](doc/agents/skill_agent.md)
+> **Documenatation of Guide Agent** :
+
+[![Agent Guide](https://img.shields.io/badge/Documentation-Agents-blue?style=for-the-badge&logo=markdown)](doc/agents/agent_guide.md)
+
+> **Documenatation of Skill Agent** :
+
+[![Agent Skill](https://img.shields.io/badge/Documentation-Example_of_skill_md-blue?style=for-the-badge&logo=markdown)](doc/agents/skill_agent.md)
 
 ---
 

@@ -1,27 +1,26 @@
 # AgentRAG.io Changelog
 
-## Version v1.1.90 - [29/10/2026]
+## Version v1.1.91 - [01/11/2026]
 
-This update introduces support for multiple new service providers and integrates LlamaServer functionality into the system.
+This pull request reviews and updates the implementation, documentation, and frontend display related to the websearch agent.
 
 ---
 
 ### New Features & Enhancements
 
-#### Expanded Provider Support
-The backend factory and frontend components have been updated to incorporate several new provider options, enhancing connectivity.
+#### Update websearch agent logic
+Modifies the backend definition for the websearch agent.
 
-*   **New providers added:** Multiple new service providers were integrated into the system.
-*   **Updated provider logic:** The `provider_factory.py` was significantly updated to handle expanded provider configurations.
+*   **Agent types update:** Updated the definition of the websearch agent in the backend.
 
-#### LlamaServer Integration
-New C++ files were added to support LlamaServer functionality, improving local model serving capabilities.
+#### Review agent documentation
+Updates the documentation related to the websearch agent.
 
-*   **Added llamaserver.cpp:** The core logic for `llamaserver.cpp` was implemented and added to the codebase.
-*   **Frontend integration:** Changes were made in the frontend to support LlamaServer features.
+*   **Documentation review:** Reviewed and updated the documentation for the websearch agent.
 
-**Fixes & Bug Resolutions**
+#### Frontend agent display update
+Adjusts the frontend display related to agents.
 
-*   **JudgeLLM value fix:** Corrected a change value issue related to JudgeLLM functionality.
+*   **UI frontend change:** Made changes to the Agents page in the frontend.
 
 ---
