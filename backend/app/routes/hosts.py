@@ -1,18 +1,21 @@
 """
 Routes Remote Hosts — /api/hosts
 
+Protocols : ssh | winrm | psrp | db
+
 Endpoints :
   POST   /api/hosts              Enregistrer un host (credentials chiffrés en DB)
   GET    /api/hosts/             Lister ses hosts (sans credentials)
   GET    /api/hosts/{id}         Détail d'un host (sans credentials)
   PUT    /api/hosts/{id}         Modifier / rotation credentials
   DELETE /api/hosts/{id}         Supprimer
-  POST   /api/hosts/{id}/test    Tester la connexion
-  GET    /api/hosts/protocol/{p} Filtrer par protocol (ssh | winrm)
+  POST   /api/hosts/{id}/test    Tester la connexion (via le MCP server du protocol)
+  GET    /api/hosts/protocol/{p} Filtrer par protocol (ssh | winrm | psrp | db)
 """
 import logging
+import time
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,33 +26,63 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import User
 from app.models.remote_host import RemoteHost
-from app.utils.security import encrypt_api_key, decrypt_api_key
+from app.utils.security import encrypt_api_key
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/hosts", tags=["Remote Hosts"])
 
-VALID_PROTOCOLS   = {"ssh", "winrm"}
-VALID_CRED_TYPES  = {"password", "key", "key+passphrase", "ntlm", "kerberos"}
-DEFAULT_PORTS     = {"ssh": 22, "winrm": 5985}
+VALID_PROTOCOLS  = {"ssh", "winrm", "psrp", "db"}
+VALID_CRED_TYPES = {"password", "key", "key+passphrase", "ntlm", "kerberos", "negotiate", "credssp"}
+DEFAULT_PORTS    = {"ssh": 22, "winrm": 5985, "psrp": 5985}
+
+# Restriction des credential_type par protocol (ssh / winrm : comportement historique inchangé)
+PROTOCOL_CRED_TYPES = {
+    "psrp": {"password", "ntlm", "negotiate", "kerberos", "credssp"},
+    "db":   {"password"},
+}
+
+# ── PSRP ──────────────────────────────────────────────────────────────────────
+PSRP_TRANSPORTS = {"negotiate", "ntlm", "kerberos", "basic", "credssp"}   # → pypsrp `auth`
+PSRP_AUTH_CRED_TYPES = {"ntlm", "negotiate", "kerberos", "credssp"}       # credential_type → transport
+
+# ── DB ────────────────────────────────────────────────────────────────────────
+DB_TYPE_ALIASES = {
+    "mysql": "mysql", "mariadb": "mariadb",
+    "postgresql": "postgresql", "postgres": "postgresql", "pg": "postgresql",
+    "mssql": "mssql", "sqlserver": "mssql",
+}
+DB_DEFAULT_PORTS = {"mysql": 3306, "mariadb": 3306, "postgresql": 5432, "mssql": 1433}
+
+# kwargs driver autorisés dans db_options (liste blanche : pas d'init_command, local_infile, etc.)
+DB_ALLOWED_OPTIONS = {
+    "mysql":      {"ssl", "ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert", "ssl_verify_identity"},
+    "mariadb":    {"ssl", "ssl_ca", "ssl_cert", "ssl_key", "ssl_verify_cert", "ssl_verify_identity"},
+    "postgresql": {"sslmode", "sslrootcert", "sslcert", "sslkey", "application_name"},
+    "mssql":      {"tds_version", "appname"},
+}
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 
 class RemoteHostCreate(BaseModel):
     name:             str              = Field(..., min_length=1, max_length=255)
-    protocol:         str              = Field(..., pattern="^(ssh|winrm)$")
+    protocol:         str              = Field(..., pattern="^(ssh|winrm|psrp|db)$")
     host:             str              = Field(..., min_length=1, max_length=255)
-    port:             Optional[int]    = None
+    port:             Optional[int]    = Field(None, ge=1, le=65535)
     username:         str              = Field(..., min_length=1)
     credential_type:  str              = Field(...)
     # Auth fields (en clair à la réception → chiffrés immédiatement)
     password:         Optional[str]    = None
-    key_content:      Optional[str]    = None   # PEM string
+    key_content:      Optional[str]    = None   # PEM string (ssh)
     key_passphrase:   Optional[str]    = None
-    domain:           Optional[str]    = None   # WinRM NTLM
-    # WinRM options
-    winrm_transport:               Optional[str] = "ntlm"
-    winrm_server_cert_validation:  Optional[str] = "ignore"
+    domain:           Optional[str]    = None   # WinRM / PSRP NTLM
+    # WinRM / PSRP options (PSRP : winrm_transport = méthode d'auth pypsrp)
+    winrm_transport:               Optional[str] = None
+    winrm_server_cert_validation:  Optional[str] = None
+    # DB options (protocol=db)
+    db_type:     Optional[str]            = None   # mysql | mariadb | postgresql | mssql
+    db_name:     Optional[str]            = Field(None, max_length=128)   # base par défaut
+    db_options:  Optional[Dict[str, Any]] = None   # kwargs driver (liste blanche)
     # Metadata
     tags:   Optional[List[str]] = []
     notes:  Optional[str]       = None
@@ -58,7 +91,7 @@ class RemoteHostCreate(BaseModel):
 class RemoteHostUpdate(BaseModel):
     name:             Optional[str]    = None
     host:             Optional[str]    = None
-    port:             Optional[int]    = None
+    port:             Optional[int]    = Field(None, ge=1, le=65535)
     username:         Optional[str]    = None
     credential_type:  Optional[str]    = None
     password:         Optional[str]    = None
@@ -67,6 +100,9 @@ class RemoteHostUpdate(BaseModel):
     domain:           Optional[str]    = None
     winrm_transport:              Optional[str] = None
     winrm_server_cert_validation: Optional[str] = None
+    db_type:     Optional[str]            = None
+    db_name:     Optional[str]            = Field(None, max_length=128)
+    db_options:  Optional[Dict[str, Any]] = None
     tags:     Optional[List[str]] = None
     notes:    Optional[str]       = None
     is_active: Optional[bool]     = None
@@ -83,6 +119,9 @@ class RemoteHostResponse(BaseModel):
     credential_type:  str
     domain:           Optional[str]
     winrm_transport:  Optional[str]
+    db_type:          Optional[str] = None
+    db_name:          Optional[str] = None
+    db_options:       Optional[dict] = None
     tags:             List[str]
     os_info:          Optional[dict]
     notes:            Optional[str]
@@ -110,6 +149,77 @@ def _encrypt_if_set(value: Optional[str]) -> Optional[str]:
     return encrypt_api_key(value) if value else None
 
 
+def _check_credential_type(protocol: str, credential_type: str) -> None:
+    if credential_type not in VALID_CRED_TYPES:
+        raise HTTPException(400, f"Invalid credential_type. Valid: {sorted(VALID_CRED_TYPES)}")
+    allowed = PROTOCOL_CRED_TYPES.get(protocol)
+    if allowed and credential_type not in allowed:
+        raise HTTPException(
+            400, f"credential_type '{credential_type}' invalid for protocol '{protocol}'. Valid: {sorted(allowed)}"
+        )
+
+
+def _normalize_db_type(value: Optional[str]) -> str:
+    t = DB_TYPE_ALIASES.get((value or "").strip().lower())
+    if not t:
+        raise HTTPException(400, f"Invalid or missing db_type. Valid: {sorted(set(DB_TYPE_ALIASES.values()))}")
+    return t
+
+
+def _check_db_options(db_type: str, options: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not options:
+        return None
+    unknown = set(options) - DB_ALLOWED_OPTIONS[db_type]
+    if unknown:
+        raise HTTPException(
+            400, f"Unsupported db_options for {db_type}: {sorted(unknown)}. "
+                 f"Allowed: {sorted(DB_ALLOWED_OPTIONS[db_type])}"
+        )
+    return options
+
+
+def _check_psrp_transport(transport: str) -> str:
+    if transport not in PSRP_TRANSPORTS:
+        raise HTTPException(400, f"Invalid winrm_transport for psrp. Valid: {sorted(PSRP_TRANSPORTS)}")
+    return transport
+
+
+async def _probe_host(host: RemoteHost, db: Session, user_id: UUID) -> Tuple[bool, Optional[str]]:
+    """Appelle le MCP server du protocol. Retourne (success, error)."""
+    uid = str(user_id)
+
+    if host.protocol == "ssh":
+        from app.mcp.servers.ssh_server import SSHMCPServer
+        mcp = SSHMCPServer(db=db, user_id=uid)
+        result = await mcp.exec_command(host=host.name, cmd="echo agentrag_ok", timeout=10)
+        success = result["success"] and "agentrag_ok" in result["stdout"]
+
+    elif host.protocol == "winrm":
+        from app.mcp.servers.winrm_server import WinRMMCPServer
+        mcp = WinRMMCPServer(db=db, user_id=uid)
+        result = await mcp.exec_powershell(host=host.name, script="Write-Output 'agentrag_ok'")
+        success = result["success"] and "agentrag_ok" in result["stdout"]
+
+    elif host.protocol == "psrp":
+        from app.mcp.servers.psrp_server import PSRPMCPServer
+        mcp = PSRPMCPServer(db=db, user_id=uid)
+        result = await mcp.exec_powershell(
+            host=host.name, script="Write-Output 'agentrag_ok'", timeout=15
+        )
+        success = result["success"] and "agentrag_ok" in result["stdout"]
+
+    elif host.protocol == "db":
+        from app.mcp.servers.db_server import DBMCPServer
+        mcp = DBMCPServer(db=db, user_id=uid)
+        result = await mcp.test_connection(host=host.name)
+        success = bool(result["success"])
+
+    else:
+        raise ValueError(f"Unknown protocol: {host.protocol}")
+
+    return success, (None if success else (result.get("stderr") or result.get("error") or "connection test failed"))
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.post("/", response_model=RemoteHostResponse, status_code=status.HTTP_201_CREATED)
@@ -122,14 +232,16 @@ async def create_host(
     Enregistre un nouveau host distant.
     Les credentials sont chiffrés immédiatement et jamais retournés en clair.
 
-    Exemples credential_type :
-    - SSH par clé    : credential_type="key", key_content="-----BEGIN RSA..."
-    - SSH par mdp    : credential_type="password", password="monmdp"
-    - WinRM NTLM     : credential_type="ntlm", password="monmdp"
-    - WinRM Kerberos : credential_type="kerberos" (auth système)
+    Exemples :
+    - SSH par clé    : protocol="ssh",   credential_type="key", key_content="-----BEGIN RSA..."
+    - SSH par mdp    : protocol="ssh",   credential_type="password", password="monmdp"
+    - WinRM NTLM     : protocol="winrm", credential_type="ntlm", password="monmdp"
+    - PSRP NTLM      : protocol="psrp",  credential_type="ntlm", password="monmdp"
+    - PSRP Kerberos  : protocol="psrp",  credential_type="kerberos" (ticket système, sans password)
+    - DB             : protocol="db", credential_type="password", username="app", password="***",
+                       db_type="mysql", db_name="appdb", port=3306 (défaut selon db_type), tags=["db"]
     """
-    if payload.credential_type not in VALID_CRED_TYPES:
-        raise HTTPException(400, f"Invalid credential_type. Valid: {VALID_CRED_TYPES}")
+    _check_credential_type(payload.protocol, payload.credential_type)
 
     # Vérifier unicité name pour ce user
     existing = db.query(RemoteHost).filter(
@@ -139,20 +251,52 @@ async def create_host(
     if existing:
         raise HTTPException(409, f"Host with name '{payload.name}' already exists")
 
+    port = payload.port or DEFAULT_PORTS.get(payload.protocol)
+    transport: Optional[str] = None
+    cert_validation: Optional[str] = None
+    db_type = db_name = db_options = None
+
+    if payload.protocol != "db" and (payload.db_type or payload.db_name or payload.db_options):
+        raise HTTPException(400, "db_type / db_name / db_options are only valid for protocol='db'")
+
+    if payload.protocol == "winrm":
+        transport = payload.winrm_transport or "ntlm"
+        cert_validation = payload.winrm_server_cert_validation or "ignore"
+
+    elif payload.protocol == "psrp":
+        transport = _check_psrp_transport(
+            payload.winrm_transport
+            or (payload.credential_type if payload.credential_type in PSRP_AUTH_CRED_TYPES else "negotiate")
+        )
+        cert_validation = payload.winrm_server_cert_validation or "ignore"
+        if transport != "kerberos" and not payload.password:
+            raise HTTPException(400, f"password is required for psrp transport '{transport}'")
+
+    elif payload.protocol == "db":
+        db_type = _normalize_db_type(payload.db_type)
+        db_name = payload.db_name
+        db_options = _check_db_options(db_type, payload.db_options)
+        port = payload.port or DB_DEFAULT_PORTS[db_type]
+        if not payload.password:
+            raise HTTPException(400, "password is required for protocol='db'")
+
     host = RemoteHost(
         user_id          = current_user.id,
         name             = payload.name,
         protocol         = payload.protocol,
         host             = payload.host,
-        port             = payload.port or DEFAULT_PORTS.get(payload.protocol),
+        port             = port,
         username         = payload.username,
         credential_type  = payload.credential_type,
         encrypted_password = _encrypt_if_set(payload.password),
         key_content        = _encrypt_if_set(payload.key_content),
         key_passphrase     = _encrypt_if_set(payload.key_passphrase),
         domain             = payload.domain,
-        winrm_transport              = payload.winrm_transport,
-        winrm_server_cert_validation = payload.winrm_server_cert_validation,
+        winrm_transport              = transport,
+        winrm_server_cert_validation = cert_validation,
+        db_type    = db_type,
+        db_name    = db_name,
+        db_options = db_options,
         tags   = payload.tags or [],
         notes  = payload.notes,
     )
@@ -191,9 +335,9 @@ async def list_hosts_by_protocol(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Raccourci : GET /api/hosts/protocol/ssh ou /api/hosts/protocol/winrm"""
+    """Raccourci : GET /api/hosts/protocol/{ssh|winrm|psrp|db}"""
     if protocol not in VALID_PROTOCOLS:
-        raise HTTPException(400, f"Invalid protocol. Valid: {VALID_PROTOCOLS}")
+        raise HTTPException(400, f"Invalid protocol. Valid: {sorted(VALID_PROTOCOLS)}")
     return db.query(RemoteHost).filter(
         RemoteHost.user_id == current_user.id,
         RemoteHost.protocol == protocol,
@@ -220,12 +364,37 @@ async def update_host(
     """
     Modifier un host. Utilisé pour :
     - Rotation de credentials (nouveau password / nouvelle clé)
-    - Modifier les tags, notes
+    - Modifier les tags, notes, db_name, db_options
     - Désactiver (is_active=false)
+    Le protocol n'est pas modifiable.
     """
     host = _get_host_or_404(host_id, current_user.id, db)
 
     update_data = payload.model_dump(exclude_none=True)
+
+    if "name" in update_data and update_data["name"] != host.name:
+        clash = db.query(RemoteHost).filter(
+            RemoteHost.user_id == current_user.id,
+            RemoteHost.name == update_data["name"],
+        ).first()
+        if clash:
+            raise HTTPException(409, f"Host with name '{update_data['name']}' already exists")
+
+    if "credential_type" in update_data:
+        _check_credential_type(host.protocol, update_data["credential_type"])
+
+    if host.protocol != "db" and any(k in update_data for k in ("db_type", "db_name", "db_options")):
+        raise HTTPException(400, "db_type / db_name / db_options are only valid for protocol='db'")
+
+    if host.protocol == "psrp" and "winrm_transport" in update_data:
+        _check_psrp_transport(update_data["winrm_transport"])
+
+    if host.protocol == "db":
+        if "db_type" in update_data:
+            update_data["db_type"] = _normalize_db_type(update_data["db_type"])
+        if "db_options" in update_data:
+            effective_type = update_data.get("db_type") or host.db_type
+            _check_db_options(effective_type, update_data["db_options"])
 
     # Chiffrer les credentials si fournis
     if "password" in update_data:
@@ -265,34 +434,18 @@ async def test_host_connection(
     db: Session = Depends(get_db),
 ):
     """
-    Teste la connexion au host.
-    SSH  → exécute 'echo ok'
-    WinRM → exécute Write-Output 'ok'
+    Teste la connexion au host via le MCP server correspondant.
+    SSH   → ssh_server.exec_command('echo agentrag_ok')
+    WinRM → winrm_server.exec_powershell("Write-Output 'agentrag_ok'")
+    PSRP  → psrp_server.exec_powershell("Write-Output 'agentrag_ok'")
+    DB    → db_server.test_connection()  (SELECT 'agentrag_ok')
     Retourne : {"success": bool, "latency_ms": int, "error": str|null}
     """
     host = _get_host_or_404(host_id, current_user.id, db)
-    import time
     start = time.time()
 
     try:
-        if host.protocol == "ssh":
-            from app.mcp.servers.ssh_server import SSHMCPServer
-            mcp = SSHMCPServer(db=db, user_id=str(current_user.id))
-            result = await mcp.exec_command(
-                host=host.name, cmd="echo agentrag_ok", timeout=10
-            )
-            success = result["success"] and "agentrag_ok" in result["stdout"]
-
-        elif host.protocol == "winrm":
-            from app.mcp.servers.winrm_server import WinRMMCPServer
-            mcp = WinRMMCPServer(db=db, user_id=str(current_user.id))
-            result = await mcp.exec_powershell(
-                host=host.name, script="Write-Output 'agentrag_ok'"
-            )
-            success = result["success"] and "agentrag_ok" in result["stdout"]
-        else:
-            raise ValueError(f"Unknown protocol: {host.protocol}")
-
+        success, error = await _probe_host(host, db, current_user.id)
         latency_ms = int((time.time() - start) * 1000)
 
         if success:
@@ -304,7 +457,7 @@ async def test_host_connection(
             "latency_ms": latency_ms,
             "host":       host.name,
             "protocol":   host.protocol,
-            "error":      result.get("stderr") if not success else None,
+            "error":      error,
         }
 
     except Exception as e:

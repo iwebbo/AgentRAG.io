@@ -1,26 +1,29 @@
 # AgentRAG.io Changelog
 
-## Version v1.1.91 - [01/11/2026]
+## Version v1.1.93 - [03/11/2026]
 
-This pull request reviews and updates the implementation, documentation, and frontend display related to the websearch agent.
+Adds RAG (Retrieval-Augmented Generation) feature with comprehensive context management services for chat reviews.
 
 ---
 
 ### New Features & Enhancements
 
-#### Update websearch agent logic
-Modifies the backend definition for the websearch agent.
+#### RAG Context Management
+Implements retrieval-augmented generation context handling through new service modules.
 
-*   **Agent types update:** Updated the definition of the websearch agent in the backend.
+*   **rag_context.py:** New RAG-specific context management service
+*   **conversation_context.py:** Conversation state tracking for chat sessions
 
-#### Review agent documentation
-Updates the documentation related to the websearch agent.
+#### Chat Review Improvements
+Enhances chat review functionality with improved context handling.
 
-*   **Documentation review:** Reviewed and updated the documentation for the websearch agent.
+*   **chat.py routes:** Updated chat route handlers for RAG integration
+*   **rag_chat.py routes:** New RAG-specific chat endpoint implementation
 
-#### Frontend agent display update
-Adjusts the frontend display related to agents.
+#### Context Budget & Limits
+Adds model limits and context budget tracking services.
 
-*   **UI frontend change:** Made changes to the Agents page in the frontend.
+*   **context_budget.py:** Service for managing context token budgets
+*   **model_limits.py:** Service for enforcing model usage limits
 
 ---

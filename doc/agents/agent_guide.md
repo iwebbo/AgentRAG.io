@@ -22,6 +22,8 @@
 | **WikiJS Assistant** | `wikijs` | fixed | `wikijs` | Search, read, create and update Wiki.js documentation pages via LLM |
 | **SSH Agent** | `skill` (.md) | Remote command execution on Linux/Unix hosts | SSH (DB-aware) | — |
 | **WinRM Agent** | `skill` (.md) | Remote PowerShell execution on Windows hosts | WinRM (DB-aware) | — |
+ **PSRP Agent** | `skill` (.md) | Remote PowerShell execution on Windows hosts | PSRP (DB-aware) | — |
+  **DB Agent** | `skill` (.md) | Remote DB execution on MySQL, MSSQL, PostGresSQL | DB (DB-aware) | — |
 | **Skill Agent** | `skill` | Any custom agent defined via `.md` frontmatter | Any registered MCP | Any project |
 | **SonarQube Security** | `sonarqube` | Projects inventory, vulnerabilities, security hotspots, quality gate, and LLM-assisted remediation (modes: `projects`, `overview`, `issues`, `hotspots`, `remediate`) | `sonarqube` | Optional — repository project (`use_rag: true` + `project_id`) |
 
@@ -46,7 +48,9 @@
 *   **[Email Expert Agent](email_expert_agent.md)** : Assists in drafting, analyzing, and tracking email communications using an LLM.
 *   **[Web Search Agent](web_search_agent.md)** : Searches for real-time information on the web and synthesizes multiple results.
 *   **[SSH Agent](ssh_agent.md)** : Executes remote commands on Linux/Unix hosts via SSH.
-*   **[WinRM Agent](winrm_agent.md)** : Executes remote PowerShell scripts on Windows machines.
+*   **[WinRM Agent](winrm_agent.md)** : Executes remote PowerShell scripts via WinRM on Windows machines.
+*   **[PSRP Agent](psrp_agent.md)** : Executes remote PowerShell scripts via PSRP on Windows machines.
+*   **[DB Agent](db_agent.md)** : Executes remote SQL on DB machines.
 *   **[SonarQube Security Agent](sonarqube_security_agent.md)** : Audits project security, identifies vulnerabilities, and suggests remediation steps.
 *   **[WikiJS Assistant](wikijs_agent.md)** : Comprehensive management of Wiki content (reading, creating, updating) using an LLM.
 *   **[DataGouv FR Agent](datagouv_fr_agent.md)** : Explores and performs targeted searches within the French open data catalog.

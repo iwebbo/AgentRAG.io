@@ -76,6 +76,11 @@ ddgs>=1.36
 #Agent
 paramiko>=3.4.0
 pywinrm>=0.4.3
+pymysql>=1.1.1,<2.0.0
+psycopg2-binary>=2.9.9,<3.0.0
+pymssql>=2.3.0,<3.0.0
+pywinrm>=0.4.3
+pypsrp>=0.8.1,<1.0.0
 
 #Exports
 weasyprint>=62.0
@@ -88,3 +93,6 @@ spacy==3.7.2
 # Scheduler
 croniter>=2.0.5,<7.0.0
 tzdata>=2024.1
+
+#PSRP
+pypsrp

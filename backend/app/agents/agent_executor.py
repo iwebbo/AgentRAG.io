@@ -26,6 +26,9 @@ from app.mcp.servers.gitea_server import GiteaMCPServer
 from app.mcp.servers.datagouv_server import DataGouvMCPServer
 from app.mcp.servers.wikijs_server import WikiJSMCPServer
 from app.mcp.servers.sonarqube_server import SonarQubeMCPServer
+from app.mcp.servers.bitbucket_mcp_server import BitbucketMCPServer
+from app.mcp.servers.psrp_server import PSRPMCPServer
+from app.mcp.servers.db_server import DBMCPServer
 
 # ── Agent imports ─────────────────────────────────────────────────────────────
 from app.agents.agent_types.branch_code_review_agent import BranchCodeReviewAgent
@@ -46,13 +49,15 @@ from app.agents.agent_types.github_changelog_agent import GitHubChangelogAgent
 from app.agents.agent_types.gitea_changelog_agent import GiteaChangelogAgent
 from app.agents.agent_types.github_branch_generator_agent import GitHubBranchGeneratorAgent
 from app.agents.agent_types.gitea_branch_generator_agent import GiteaBranchGeneratorAgent
+from app.agents.agent_types.bitbucket_agent import BitbucketAgent
+
 
 
 logger = logging.getLogger(__name__)
 
 
 # ── MCP servers qui ont besoin de db + user_id (credential resolution via DB)
-DB_AWARE_MCP_SERVERS = {"ssh", "winrm"}
+DB_AWARE_MCP_SERVERS = {"ssh", "winrm", "psrp", "db"}
 
 # ── MCP servers qui utilisent mcp_config classique (token/url dans config)
 MCP_REGISTRY: Dict[str, Type] = {
@@ -65,6 +70,9 @@ MCP_REGISTRY: Dict[str, Type] = {
     "datagouv":    DataGouvMCPServer,
     "wikijs":      WikiJSMCPServer,
     "sonarqube":   SonarQubeMCPServer,
+    "bitbucket":   BitbucketMCPServer,
+    "psrp":        PSRPMCPServer,
+    "db":          DBMCPServer,
 }
 
 
@@ -89,6 +97,7 @@ class AgentExecutor:
         "gitea_changelog":              GiteaChangelogAgent,
         "github_branch_generator":      GitHubBranchGeneratorAgent,
         "gitea_branch_generator":       GiteaBranchGeneratorAgent,
+        "bitbucket":                    BitbucketAgent,
     }
 
     def __init__(self, db: Session):

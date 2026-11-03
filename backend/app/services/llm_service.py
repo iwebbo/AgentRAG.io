@@ -11,14 +11,16 @@ from app.utils.security import decrypt_api_key
 from app.config import get_settings
 from app.services.verification import StreamEvent, VerificationContext, run_verified_stream
 from app.services.verification_service import build_request_pipeline, effective_mode
+from app.services.context_budget import ContextOverflow, WARN_PERCENT
+from app.services.chat_context import PreparedChat, prepare_chat_context
 
 logger = logging.getLogger(__name__)
 
 
 def estimate_tokens(text: str) -> int:
     """
-    Estimate the number of tokens in a text.
-    Rule of thumb: ~4 characters = 1 token
+    Estimate the number of tokens in a text (statistiques stockées en base).
+    Le budget de contexte utilise context_budget.count_tokens (tiktoken + marge).
     """
     if not text:
         return 0
@@ -64,7 +66,8 @@ class LLMService:
         reasoning_mode: str
     ) -> List[Dict[str, str]]:
         """
-        Prepare messages array for LLM
+        Chemin historique (managed_context=False) : agents, scheduler.
+        Rejoue conversation.messages tel quel, sans filtrage de rôles.
         """
         messages = []
         
@@ -109,6 +112,76 @@ class LLMService:
         })
         
         return messages
+
+    # ------------------------------------------------------------------
+    # Context budget (chat sans RAG)
+    # ------------------------------------------------------------------
+    def _load_past_messages(self, conversation_id: UUID) -> List[Message]:
+        return (
+            self.db.query(Message)
+            .filter(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.asc())
+            .all()
+        )
+
+    def _build_prepared(
+        self,
+        conversation: Conversation,
+        past_messages: List[Message],
+        message: str,
+        reasoning_mode: Optional[str],
+        model: Optional[str],
+    ) -> PreparedChat:
+        prepared = prepare_chat_context(
+            past_messages=past_messages,
+            system_prompt=conversation.system_prompt,
+            reasoning_mode=reasoning_mode,
+            question=message,
+            model=model or conversation.model,
+        )
+        usage = prepared.usage
+        logger.info(
+            " limit=%s | historique complet=%s (%s msgs, %s chunks repris)",
+            f"{usage.limit:,}", f"{usage.history_tokens:,}",
+            usage.history_messages, usage.carried_chunks,
+        )
+        if usage.percent >= WARN_PERCENT:
+            logger.warning(usage.log_line())
+        else:
+            logger.info(usage.log_line())
+        return prepared
+
+    def preflight(
+        self,
+        conversation: Conversation,
+        message: str,
+        reasoning_mode: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> PreparedChat:
+        """Calcule le contexte complet sans rien persister.
+
+        Lève ContextOverflow si prompt + historique + question + réserve de
+        sortie dépassent la limite du modèle. À appeler depuis la route AVANT
+        d'ouvrir le StreamingResponse pour pouvoir renvoyer un 400 propre.
+        """
+        prepared = self._build_prepared(
+            conversation,
+            self._load_past_messages(conversation.id),
+            message,
+            reasoning_mode or conversation.reasoning_mode,
+            model,
+        )
+        self._raise_if_overflow(prepared)
+        return prepared
+
+    @staticmethod
+    def _raise_if_overflow(prepared: PreparedChat) -> None:
+        u = prepared.usage
+        if u.overflow:
+            raise ContextOverflow(
+                f"Contexte trop grand : {u.used:,} tokens + réserve réponse {u.reserve:,} "
+                f"> limite {u.limit:,}. Démarrez une nouvelle conversation ou raccourcissez le message."
+            )
     
     async def stream_chat(
         self,
@@ -120,16 +193,28 @@ class LLMService:
         temperature: Optional[float] = None,
         reasoning_mode: Optional[str] = None,
         verify_mode: Optional[str] = None,
-        emit_events: bool = False
+        emit_events: bool = False,
+        managed_context: bool = False,
+        enforce_context: bool = True
     ) -> AsyncGenerator[Any, None]:
         """
         Stream chat completion.
 
         Yields `str` chunks (unchanged contract for existing callers). With
-        `emit_events=True` it also yields `StreamEvent` objects (status / verdict /
-        keepalive) for the SSE layer. `verify_mode`: off | annotate | gate
+        `emit_events=True` it also yields `StreamEvent` objects (context / status /
+        verdict / keepalive) for the SSE layer. `verify_mode`: off | annotate | gate
         (default: settings.VERIFY_MODE). Verification is lint/check/judge based,
         see app/services/verification.
+
+        `managed_context=False` (défaut) : comportement historique, inchangé
+        (`_prepare_messages` sur `conversation.messages` + message). C'est le mode
+        des agents / scheduler, qui peuvent pré-remplir `conversation.messages`
+        avec des lignes system/user sans réponse assistant.
+
+        `managed_context=True` (chat simple) : contexte = system prompt + historique
+        user/assistant COMPLET + question, mesuré contre la limite du modèle
+        (`chat_context`). `enforce_context=False` : log seulement, ne lève pas
+        ContextOverflow.
         """
         start_time = time.time()
         
@@ -143,12 +228,23 @@ class LLMService:
         if not conversation:
             raise ValueError("Conversation not found")
         
-        message_count = self.db.query(Message).filter(
-            Message.conversation_id == conversation_id
-        ).count()
-        
-        is_first_message = (message_count == 0)
-        
+        used_reasoning = reasoning_mode or conversation.reasoning_mode
+        prepared: Optional[PreparedChat] = None
+
+        if managed_context:
+            past_messages = self._load_past_messages(conversation_id)
+            is_first_message = (len(past_messages) == 0)
+            prepared = self._build_prepared(
+                conversation, past_messages, message, used_reasoning, model
+            )
+            if enforce_context:
+                self._raise_if_overflow(prepared)
+        else:
+            message_count = self.db.query(Message).filter(
+                Message.conversation_id == conversation_id
+            ).count()
+            is_first_message = (message_count == 0)
+
         # Save user message WITH token estimation
         user_tokens = estimate_tokens(message)
         user_message = Message(
@@ -160,7 +256,13 @@ class LLMService:
         self.db.add(user_message)
         self.db.commit()
         logger.info(f"User message saved: {message[:50]}... (tokens: {user_tokens})")
-        
+
+        if prepared is not None:
+            messages = prepared.messages
+        else:
+            # Chemin historique (agents, scheduler) : strictement l'ancien comportement.
+            messages = self._prepare_messages(conversation, message, used_reasoning)
+
         provider = await self.get_active_provider(
             user_id,
             provider_name or conversation.provider_name
@@ -177,16 +279,10 @@ class LLMService:
             config=provider.config
         )
         
-        messages = self._prepare_messages(
-            conversation,
-            message,
-            reasoning_mode or conversation.reasoning_mode
-        )
-        
         settings = get_settings()
         mode = effective_mode(verify_mode)
         used_model = model or conversation.model
-        used_temperature = temperature or conversation.temperature
+        used_temperature = temperature if temperature is not None else conversation.temperature
 
         def open_stream(msgs):
             return llm_provider.stream_completion(
@@ -202,6 +298,10 @@ class LLMService:
         verdict = None
         saved_message = None
         try:
+            if emit_events and prepared is not None:
+                # Jauge used/limit côté front (même payload que le chat RAG)
+                yield StreamEvent(kind="context", data=prepared.usage.to_event())
+
             logger.info("Starting LLM streaming (verify mode: %s)...", mode)
             logger.info("Reasoning mode: %s (user input)", reasoning_mode)
             logger.info("Fallback reasoning mode: %s", conversation.reasoning_mode)

@@ -9,7 +9,7 @@ from app.database import Base
 
 class RemoteHost(Base):
     """
-    Host distant enregistré pour SSH ou WinRM.
+    Host distant enregistré pour SSH, WinRM, PSRP ou DB (MySQL/MariaDB/PostgreSQL/SQL Server).
     Les credentials sont chiffrés via Fernet (même clé que providers LLM).
     Jamais retournés en clair dans les réponses API.
     """
@@ -20,23 +20,29 @@ class RemoteHost(Base):
 
     # ── Identification ─────────────────────────────────────────────────────
     name     = Column(String(255), nullable=False)   # alias: "web-prod-01"
-    protocol = Column(String(10),  nullable=False)   # "ssh" | "winrm"
+    protocol = Column(String(10),  nullable=False)   # "ssh" | "winrm" | "psrp" | "db"
     host     = Column(String(255), nullable=False)   # IP ou hostname
-    port     = Column(Integer,     nullable=True)    # défaut: 22/5985 si null
+    port     = Column(Integer,     nullable=True)    # défaut: 22 / 5985 / selon db_type si null
 
     # ── Auth ───────────────────────────────────────────────────────────────
     username        = Column(String(255), nullable=False)
     credential_type = Column(String(30),  nullable=False)
-    # "password" | "key" | "key+passphrase" | "ntlm" | "kerberos"
+    # "password" | "key" | "key+passphrase" | "ntlm" | "kerberos" | "negotiate" | "credssp"
 
     encrypted_password = Column(Text, nullable=True)  # Fernet chiffré
     key_content        = Column(Text, nullable=True)  # PEM clé privée chiffré
     key_passphrase     = Column(Text, nullable=True)  # passphrase chiffrée
     domain             = Column(String(255), nullable=True)  # pour NTLM
 
-    # ── WinRM spécifique ───────────────────────────────────────────────────
+    # ── WinRM / PSRP spécifique ────────────────────────────────────────────
+    # PSRP : winrm_transport = méthode d'auth pypsrp (negotiate|ntlm|kerberos|basic|credssp)
     winrm_transport          = Column(String(20), nullable=True, default="ntlm")
     winrm_server_cert_validation = Column(String(20), nullable=True, default="ignore")
+
+    # ── DB spécifique (protocol="db") ──────────────────────────────────────
+    db_type    = Column(String(20),  nullable=True)   # mysql | mariadb | postgresql | mssql
+    db_name    = Column(String(128), nullable=True)   # base par défaut
+    db_options = Column(JSON,        nullable=True)   # kwargs driver (liste blanche côté API)
 
     # ── Metadata ───────────────────────────────────────────────────────────
     tags           = Column(JSON,    default=list)   # ["prod", "linux", "web"]

@@ -125,8 +125,8 @@ const AGENT_TYPES = {
   },
   skill: {
     name: 'Skill Agent',
-    description: 'Executes a registered .md skill (ssh_admin, winrm_admin, k8s_ops, postgres_ops…) on a remote host via SSH or WinRM',
-    icon: '⌥', color: '#6366f1', badge: 'skill', mcp: ['ssh', 'winrm'],
+    description: 'Executes a registered .md skill (ssh_admin, winrm_admin, k8s_ops, postgres_ops…) on a remote host via SSH, WinRM, PSRP or a database connection (DB)',
+    icon: '⌥', color: '#6366f1', badge: 'skill', mcp: ['ssh', 'winrm', 'psrp', 'db'],
     defaultConfig: (providers) => ({ mcp_servers: ['ssh'], llm_provider: providers[0]?.name || 'lmstudio', llm_model: 'openai/gpt-oss-20b', llm_temperature: 0.2, memory_scope: 'session+global' }),
     mcpConfig: {}, requiredFields: [], executeFields: []
   },
@@ -365,7 +365,50 @@ const AGENT_TYPES = {
       { name: 'with_quality_gate', label: 'Include quality gate per project', type: 'checkbox', defaultValue: false },
       { name: 'in_new_code_period', label: 'New code only', type: 'checkbox', defaultValue: false },
     ]
+  },
+  // [BITBUCKET] agent Bitbucket Server / Data Center (HTTP access token) — modes read | pull_request | write
+  bitbucket: {
+    name: 'Bitbucket Assistant',
+    description: 'Bitbucket Server / Data Center — analyze a file or repository, review a Pull Request with the LLM, or rewrite a file on a dedicated branch (optional PR) via MCP Bitbucket',
+    icon: '⬡', color: '#2684FF', badge: 'fixed', mcp: ['bitbucket'],
+    defaultConfig: (providers) => ({
+      mcp_servers: ['bitbucket'],
+      mode: 'read',
+      allow_push_default: false,
+      llm_provider: providers[0]?.name || 'lmstudio',
+      llm_model: 'openai/gpt-oss-20b',
+      llm_temperature: 0.2,
+    }),
+    mcpConfig: { bitbucket: { base_url: '', token: '', verify_ssl: true, ca_bundle: '', timeout: 30 } },
+    requiredFields: ['bitbucket.base_url', 'bitbucket.token'],
+    executeFields: [
+      { name: 'mode', label: 'Mode', type: 'select', required: true, options: [
+          { value: 'read',         label: 'read — analyze a file / folder / repository' },
+          { value: 'pull_request', label: 'pull_request — LLM code review of a PR' },
+          { value: 'write',        label: 'write — LLM rewrite of a file on a dedicated branch' },
+        ], defaultValue: 'read' },
+      { name: 'url', label: 'Bitbucket URL (optional if project + repo are set)', type: 'text', placeholder: 'https://bitbucket.example.fr/projects/KEY/repos/my-repo/browse/path?at=main' },
+      { name: 'project', label: 'Project key (overrides URL)', type: 'text', placeholder: 'KEY  (personal repo: ~username)' },
+      { name: 'repo', label: 'Repository slug (overrides URL)', type: 'text', placeholder: 'my-repo' },
+      { name: 'path', label: 'Path (file or folder — mode write: file required)', type: 'text', placeholder: 'charts/app/values.yaml' },
+      { name: 'ref', label: 'Branch / tag / commit (optional — default: repo default branch)', type: 'text', placeholder: 'main' },
+      { name: 'question', label: 'Question (optional — default: general synthesis)', type: 'text', placeholder: 'How is the ingress configured?' },
+      { name: 'pr_id', label: 'Pull request ID (or use a .../pull-requests/<id> URL)', type: 'number', placeholder: '42' },
+      { name: 'post_comment', label: 'Post the review as a comment on the PR', type: 'checkbox', defaultValue: false },
+      { name: 'instruction', label: 'Rewrite instruction', type: 'textarea', required: false, placeholder: 'Add a readiness probe on /health and bump the image tag to 1.2.3...' },
+      { name: 'branch', label: 'Target branch (optional — default: auto mcp/<timestamp>-<file>)', type: 'text', placeholder: 'feature/ai-readiness-probe' },
+      { name: 'commit_message', label: 'Commit message (optional)', type: 'text', placeholder: 'chore(values): add readiness probe' },
+      { name: 'open_pr', label: 'Open a Pull Request after the commit', type: 'checkbox', defaultValue: false },
+      { name: 'pr_title', label: 'Pull request title (optional)', type: 'text', placeholder: 'values.yaml: add readiness probe' },
+    ]
   }
+};
+
+// [BITBUCKET] Champs d'exécution visibles par mode (agent bitbucket)
+const BITBUCKET_FIELDS_BY_MODE = {
+  read:         ['url', 'project', 'repo', 'path', 'ref', 'question'],
+  pull_request: ['url', 'project', 'repo', 'pr_id', 'post_comment'],
+  write:        ['url', 'project', 'repo', 'path', 'ref', 'instruction', 'branch', 'commit_message', 'open_pr', 'pr_title'],
 };
 
 // Champs d'exécution visibles par mode (agent sonarqube)
@@ -439,6 +482,58 @@ const formatSonarResult = (r) => {
     default:
       return JSON.stringify(payload, null, 2);
   }
+  return L.join('\n');
+};
+
+// [BITBUCKET] Rendu texte des résultats bitbucket — modes read | pull_request | write
+const formatBitbucketResult = (r) => {
+  if (!r || typeof r !== 'object') return '';
+  const p = r.mode ? r : (r.data && r.data.mode ? r.data : r);
+  if (!p.mode) return '';
+  const tgt = p.target || {};
+  const where = [tgt.project, tgt.repo].filter(Boolean).join('/')
+    + (tgt.path ? `/${String(tgt.path).replace(/^\//, '')}` : '')
+    + (tgt.ref ? ` @ ${tgt.ref}` : '');
+  const L = [];
+  switch (p.mode) {
+    case 'read': {
+      const extra = [tgt.type, tgt.entries != null ? `${tgt.entries} entries` : null, tgt.chars != null ? `${tgt.chars} chars` : null]
+        .filter(Boolean).join(' · ');
+      L.push(`Target: ${where}${extra ? `  (${extra})` : ''}`);
+      if (p.question) L.push(`Question: ${p.question}`);
+      L.push('', '── LLM analysis ──', p.analysis || '(empty)');
+      break;
+    }
+    case 'pull_request': {
+      const pr = p.pull_request || {};
+      L.push(
+        `PR #${pr.id ?? '?'}: ${pr.title || ''}`,
+        `${pr.fromRef || '?'} → ${pr.toRef || '?'}  [${pr.state || '?'}]  by ${pr.author || '?'}`,
+        `Comment posted on the PR: ${p.comment_posted ? 'yes' : 'no'}`,
+        '', '── LLM review ──', p.review || '(empty)'
+      );
+      break;
+    }
+    case 'write': {
+      const c = p.commit || {};
+      L.push(
+        `Target: ${where}`,
+        `Branch: ${p.branch}  (base: ${p.base_branch})`,
+        `Commit: ${c.displayId || c.commit || '—'}`
+      );
+      if (p.pull_request) {
+        L.push(`Pull request: #${p.pull_request.id} ${p.pull_request.title || ''}`);
+        if (p.pull_request.url) L.push(p.pull_request.url);
+      } else {
+        L.push('Pull request: none');
+      }
+      L.push('', '── Content preview (first 300 chars) ──', p.content_preview || '');
+      break;
+    }
+    default:
+      return JSON.stringify(p, null, 2);
+  }
+  if (p.metadata?.timestamp) L.push('', `Done: ${p.metadata.timestamp}`);
   return L.join('\n');
 };
 
@@ -566,23 +661,26 @@ const SKILL_REGISTER_CURL = `curl -X POST https://<host>/api/skills/register \\
 const MCP_SERVERS_STATIC = [
   { key: 'ssh',         transport: 'stdio', credential: 'DB (encrypted)',       tools: 'exec_command, get_system_info, upload_file, download_file, list_directory' },
   { key: 'winrm',       transport: 'stdio', credential: 'DB (encrypted)',       tools: 'exec_powershell, get_system_info, restart_service, list_services, get_event_logs, get_running_processes, exec_cleanup' },
+  { key: 'psrp',        transport: 'stdio', credential: 'DB (encrypted)',       tools: 'exec_powershell, exec_multi, exec_cmd, get_system_info, check_service, restart_service, stop_service, start_service, list_services, get_event_logs, get_running_processes, exec_cleanup, upload_file, download_file' },
+  { key: 'db',          transport: 'stdio', credential: 'DB (encrypted)',       tools: 'query, execute, exec_multi, list_databases, list_tables, describe_table, get_system_info, test_connection' },
   { key: 'gitea',       transport: 'HTTP',  credential: 'mcp_config.gitea',     tools: 'clone_repository, get_repo_tree, get_file_content, update_file, commit_and_push, create_branch, create_pull_request, get_pr, list_prs, list_commits' },
   { key: 'github',      transport: 'HTTP',  credential: 'mcp_config.github',    tools: 'get_file_content, update_file, create_pull_request, list_issues, create_review, get_pr, list_prs, list_commits, clone_repository, commit_and_push' },
   { key: 'datagouv',    transport: 'HTTP',  credential: 'none (public API)',    tools: 'search_datasets, get_dataset, search_organizations, list_topics, get_topic' },
   { key: 'wikijs',      transport: 'HTTP',  credential: 'mcp_config.wikijs',    tools: 'search_pages, get_page, create_page, update_page' },
   { key: 'sonarqube',   transport: 'HTTP',  credential: 'mcp_config.sonarqube', tools: 'validate_auth, get_system_status, list_projects, get_project, list_branches, search_issues, fetch_all_issues, get_issue, get_issues_summary, list_security_hotspots, get_security_hotspot, get_rule, get_source_snippet, get_quality_gate, get_measures' },
+  { key: 'bitbucket',   transport: 'HTTP',  credential: 'mcp_config.bitbucket', tools: 'parse_url, list_projects, list_repositories, get_repository, list_branches, get_path_type, list_directory, get_file_content, list_commits, list_pull_requests, get_pull_request, get_pull_request_diff, create_branch, write_file, create_pull_request, add_pull_request_comment' },
   { key: 'linter',      transport: 'stdio', credential: 'none',                 tools: 'lint_file, format_file, lint_directory, check_syntax' },
   { key: 'test_runner', transport: 'stdio', credential: 'none',                 tools: 'run_tests, run_single_test, get_coverage' },
 ];
 
 const DOC_ENTRIES = [
   {
-    key: 'skill', icon: '⌥', title: 'Skill agents (SSH / WinRM / Ops)',
-    desc: 'Register .md skills with a ## Mapping section. The "Command" field at execution must match a mapping entry. Skills: ssh_admin, winrm_admin, k8s_ops, postgres_ops, web_server_ops…',
+    key: 'skill', icon: '⌥', title: 'Skill agents (SSH / WinRM / PSRP / DB / Ops)',
+    desc: 'Register .md skills with a ## Mapping section. The "Command" field at execution must match a mapping entry. Skills: ssh_admin, winrm_admin, psrp_admin, db_mysql_ops, k8s_ops, postgres_ops, web_server_ops…',
     steps: [
       { n: 1, text: 'Register a .md skill via POST /api/skills/register with auto_create_agent=true. The skill_id in the frontmatter becomes the agent identifier.' },
       { n: 2, text: 'The "Command" field at execution = a phrase matching a line from ## Mapping in your .md. e.g. disk · restart nginx · pods · logs sshd · cleanup' },
-      { n: 3, text: 'Host = select from the Hosts tab. Resolution uses GET /api/hosts/ — name or IP, protocol must match (ssh vs winrm).' },
+      { n: 3, text: 'Host = select from the Hosts tab. Resolution uses GET /api/hosts/ — name or IP, protocol must match the MCP of the skill (ssh, winrm, psrp or db).' },
       { n: 4, text: 'Skill ID is optional at execution — leave empty for auto semantic search, or set it explicitly to force e.g. k8s_ops vs ssh_admin on the same host.' }
     ]
   },
@@ -600,6 +698,18 @@ const DOC_ENTRIES = [
       { n: 2, text: 'mode=projects → inventory, optional query filter and quality gate per project. mode=overview + project_key → quality gate, metrics, issue facets, hotspots, LLM posture analysis.' },
       { n: 3, text: 'mode=issues + project_key → filtered issues (types, severities, branch, new code). mode=hotspots → security hotspots with risk description and fix recommendations.' },
       { n: 4, text: 'mode=remediate + project_key (top N vulnerabilities) or issue_keys → SonarQube rule + real source snippet (+ optional repository RAG) → LLM fix per issue. Enable Repository RAG + RAG project ID in the agent configuration to align fixes with your codebase conventions.' }
+    ]
+  },
+  {
+    key: 'bitbucket', icon: '⬡', title: 'Bitbucket Assistant (fixed agent)',
+    desc: 'Fixed agent backed by MCP Bitbucket (Bitbucket Server / Data Center REST API 1.0, HTTP access token). Three modes: read, pull_request, write. Merging a PR is deliberately not exposed.',
+    steps: [
+      { n: 1, text: 'Create the agent with mcp_config.bitbucket = { base_url, token }. base_url has no /rest (keep the context path if any, e.g. /bitbucket). Token: Profile → Manage account → HTTP access tokens (or Project / Repository settings). Optional: verify_ssl, ca_bundle (internal PKI, takes precedence over verify_ssl), timeout.' },
+      { n: 2, text: 'Token permissions: Repository read for modes read and pull_request (post_comment excepted). Repository write for mode write, for open_pr and for post_comment. Repository admin is not needed.' },
+      { n: 3, text: 'Target: paste a Bitbucket URL (.../projects/KEY/repos/REPO/browse/<path>?at=<ref>, .../pull-requests/<id>, .../users/NAME/repos/REPO, .../scm/KEY/REPO.git) or set project + repo (+ path, ref, pr_id). Explicit fields override what is deduced from the URL.' },
+      { n: 4, text: 'mode=read → file: LLM analysis. Folder / repo: tree + key files (README, Dockerfile, Chart.yaml, values.yaml, Jenkinsfile, bitbucket-pipelines.yml, pom.xml, package.json, pyproject.toml, requirements.txt, go.mod) → LLM analysis. Optional question focuses the answer.' },
+      { n: 5, text: 'mode=pull_request → LLM code review of the diff (risks, bugs, security, Docker / Helm CI/CD impact). The review is only posted on the PR if "Post the review as a comment" is ticked.' },
+      { n: 6, text: 'mode=write + instruction + file path → the LLM rewrites the whole file, committed on a dedicated branch (auto mcp/<timestamp>-<file> unless branch is given), created from the base ref. A push on the default branch is refused unless allow_push_default=true in the agent configuration. open_pr opens the Pull Request. No dry run: every successful write creates a commit; if the LLM output equals the current file, nothing is committed.' }
     ]
   },
   {
@@ -687,7 +797,7 @@ const ExecutionHistoryPanel = ({ agent, agentType, onClose, onReopenExec }) => {
 
   const getPromptLabel = (exec) => {
     const d = exec.input_data || {};
-    return d.prompt || d.query || d.branch || d.project_key || d.version || d.mode || `#${exec.id?.slice(0, 8)}`;
+    return d.prompt || d.query || d.branch || d.project_key || d.version || d.url || d.instruction || d.mode || `#${exec.id?.slice(0, 8)}`;
   };
 
   return (
@@ -894,6 +1004,70 @@ const SonarQubeConfigFields = ({ formData, updateConfigField }) => {
       <div style={{ border: '1px solid var(--info)', borderLeft: '3px solid var(--info)', borderRadius: 'var(--radius)', padding: 'var(--spacing-2) var(--spacing-3)', backgroundColor: 'rgba(96,165,250,0.06)', fontSize: 'var(--text-xs)', color: 'var(--gray-700)', lineHeight: '1.6' }}>
         <strong style={{ color: 'var(--info)' }}>Token permissions.</strong> Browse on target projects is enough for projects / overview / issues / hotspots.
         Mode <code style={{ background: 'var(--gray-200)', padding: '0 3px', borderRadius: '3px' }}>remediate</code> also needs See Source Code, otherwise the LLM gets no code snippet.
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [BITBUCKET] BITBUCKET CONFIG FIELDS — partagé entre Create et Edit
+// ─────────────────────────────────────────────────────────────────────────────
+const BitbucketConfigFields = ({ formData, updateConfigField }) => {
+  const bb = formData.mcp_config.bitbucket || {};
+  const cfg = formData.config || {};
+  const hint = { fontSize: 'var(--text-xs)', color: 'var(--gray-500)' };
+  const code = { background: 'var(--gray-200)', padding: '0 3px', borderRadius: '3px' };
+  return (
+    <div style={{ padding: 'var(--spacing-4)', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-4)' }}>
+      <h3 style={{ fontWeight: '600', fontSize: 'var(--text-sm)', marginBottom: 'var(--spacing-3)' }}>Bitbucket configuration</h3>
+
+      <div className="form-group">
+        <label className="form-label">Bitbucket URL * <span style={hint}>base URL, without /rest (keep the context path if any)</span></label>
+        <input type="text" className="form-input" value={bb.base_url || ''} onChange={e => updateConfigField('mcp_config.bitbucket.base_url', e.target.value)} placeholder="https://bitbucket.aecoding.local" />
+      </div>
+      <div className="form-group">
+        <label className="form-label">HTTP access token * <span style={hint}>Profile → Manage account → HTTP access tokens</span></label>
+        <input type="password" className="form-input" value={bb.token || ''} onChange={e => updateConfigField('mcp_config.bitbucket.token', e.target.value)} placeholder="Bitbucket HTTP access token" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Verify SSL</label>
+          <select className="form-input" value={bb.verify_ssl === false ? 'false' : 'true'} onChange={e => updateConfigField('mcp_config.bitbucket.verify_ssl', e.target.value === 'true')}>
+            <option value="true">true</option>
+            <option value="false">false (not recommended)</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">CA bundle <span style={hint}>optional — overrides Verify SSL</span></label>
+          <input type="text" className="form-input" value={bb.ca_bundle || ''} onChange={e => updateConfigField('mcp_config.bitbucket.ca_bundle', e.target.value)} placeholder="/etc/ssl/certs/internal-ca.pem" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Timeout (s)</label>
+          <input type="number" className="form-input" value={bb.timeout ?? 30} onChange={e => updateConfigField('mcp_config.bitbucket.timeout', e.target.value === '' || isNaN(parseInt(e.target.value, 10)) ? 30 : parseInt(e.target.value, 10))} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--spacing-3)' }}>
+        <div className="form-group">
+          <label className="form-label">Default mode</label>
+          <select className="form-input" value={cfg.mode || 'read'} onChange={e => updateConfigField('config.mode', e.target.value)}>
+            {Object.keys(BITBUCKET_FIELDS_BY_MODE).map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Push on default branch <span style={hint}>mode write</span></label>
+          <select className="form-input" value={cfg.allow_push_default ? 'true' : 'false'} onChange={e => updateConfigField('config.allow_push_default', e.target.value === 'true')}>
+            <option value="false">forbidden (recommended) — a dedicated branch is required</option>
+            <option value="true">allowed — direct commit on the default branch</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ border: '1px solid var(--info)', borderLeft: '3px solid var(--info)', borderRadius: 'var(--radius)', padding: 'var(--spacing-2) var(--spacing-3)', backgroundColor: 'rgba(96,165,250,0.06)', fontSize: 'var(--text-xs)', color: 'var(--gray-700)', lineHeight: '1.6' }}>
+        <strong style={{ color: 'var(--info)' }}>Token permissions.</strong> <code style={code}>Repository read</code> is enough for modes read and pull_request.
+        Mode <code style={code}>write</code>, <code style={code}>open_pr</code> and <code style={code}>post_comment</code> need <code style={code}>Repository write</code>.
+        Merging a pull request is intentionally not exposed by the MCP server.
       </div>
     </div>
   );
@@ -1142,6 +1316,11 @@ const AgentConfigFields = ({ agentType, formData, providers, skills, updateConfi
       <SonarQubeConfigFields formData={formData} updateConfigField={updateConfigField} />
     )}
 
+    {/* [BITBUCKET] */}
+    {agentType === 'bitbucket' && (
+      <BitbucketConfigFields formData={formData} updateConfigField={updateConfigField} />
+    )}
+
     {/* [WEBSEARCH] */}
     {agentType === 'websearch' && (
       <WebSearchConfigFields formData={formData} updateConfigField={updateConfigField} />
@@ -1388,6 +1567,11 @@ const renderAgentOutput = (agentTypeKey, raw) => {
     const formatted = formatSonarResult(raw);
     if (formatted) return formatted;
   }
+  // [BITBUCKET]
+  if (agentTypeKey === 'bitbucket') {
+    const formatted = formatBitbucketResult(raw);
+    if (formatted) return formatted;
+  }
   // [WEBSEARCH]
   if (agentTypeKey === 'websearch') {
     const formatted = formatWebSearchResult(raw);
@@ -1417,7 +1601,7 @@ const getExecConversationId = (exec) => {
 
 const getRunLabel = (inputData) => {
   const d = inputData || {};
-  return String(d.prompt || d.query || d.branch || d.project_key || d.version || d.mode || '');
+  return String(d.prompt || d.query || d.branch || d.project_key || d.version || d.url || d.instruction || d.mode || '');
 };
 
 const fmtElapsed = (ms) => {
@@ -1599,12 +1783,13 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onStart, hosts, initialV
       if (f.defaultValue !== undefined) defaults[f.name] = f.defaultValue;
     });
     // l'agent sonarqube démarre sur le mode par défaut de sa configuration
-    if (agent.agent_type === 'sonarqube' && agent.config?.mode) defaults.mode = agent.config.mode;
+    if ((agent.agent_type === 'sonarqube' || agent.agent_type === 'bitbucket') && agent.config?.mode) defaults.mode = agent.config.mode;
     return { ...defaults, ...(initialValues || {}) };
   });
   const [error, setError] = useState(null);
 
   const isSonar = agent.agent_type === 'sonarqube';
+  const isBitbucket = agent.agent_type === 'bitbucket'; // [BITBUCKET]
 
   const handleChange = (name, value) => setExecuteData(prev => ({ ...prev, [name]: value }));
 
@@ -1695,6 +1880,20 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onStart, hosts, initialV
       if (d.tags) r.tags = d.tags.split(',').map(t => t.trim()).filter(Boolean);
       return r;
     }
+    // [BITBUCKET] seuls les champs du mode courant sont envoyés ; les booléens sont explicites
+    if (agent.agent_type === 'bitbucket') {
+      const mode = d.mode || 'read';
+      const allowed = BITBUCKET_FIELDS_BY_MODE[mode] || [];
+      const has = (k) => allowed.includes(k) && d[k] !== undefined && d[k] !== false && String(d[k]).trim() !== '';
+      const r = { mode };
+      ['url', 'project', 'repo', 'path', 'ref', 'question', 'instruction', 'branch', 'commit_message', 'pr_title'].forEach(k => {
+        if (has(k)) r[k] = String(d[k]).trim();
+      });
+      if (has('pr_id') && !isNaN(parseInt(d.pr_id, 10))) r.pr_id = parseInt(d.pr_id, 10);
+      if (mode === 'pull_request') r.post_comment = !!d.post_comment;
+      if (mode === 'write') r.open_pr = !!d.open_pr;
+      return r;
+    }
     if (agent.agent_type === 'sonarqube') {
       const mode = d.mode || 'projects';
       const allowed = SONAR_FIELDS_BY_MODE[mode] || [];
@@ -1744,6 +1943,31 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onStart, hosts, initialV
       }
       const repo = String(executeData.repo || '').trim();
       if (repo && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) { setError('Repository must use the owner/repo format'); return false; }
+      return true;
+    }
+    // [BITBUCKET]
+    if (agent.agent_type === 'bitbucket') {
+      const m = executeData.mode || 'read';
+      const url = String(executeData.url || '').trim();
+      const project = String(executeData.project || '').trim();
+      const repo = String(executeData.repo || '').trim();
+      if (!url && !(project && repo)) { setError('Provide a Bitbucket URL or project + repository'); return false; }
+      if (url && !/^https?:\/\//i.test(url)) { setError('URL must start with http:// or https://'); return false; }
+      if (m === 'pull_request') {
+        const pr = String(executeData.pr_id ?? '').trim();
+        if (pr && !/^[1-9]\d*$/.test(pr)) { setError('PR ID must be a positive integer'); return false; }
+        if (!pr && !/\/pull-requests\/\d+/.test(url)) { setError('A pull request URL (.../pull-requests/<id>) or a PR ID is required'); return false; }
+      }
+      if (m === 'write') {
+        if (!String(executeData.instruction || '').trim()) { setError('Rewrite instruction is required'); return false; }
+        const path = String(executeData.path || '').trim();
+        if (!path && !/\/browse\/[^?#]+/.test(url)) { setError('A file path is required (.../browse/<file> URL or Path field)'); return false; }
+        const branch = String(executeData.branch || '').trim();
+        if (branch && (!/^[A-Za-z0-9._/-]+$/.test(branch) || /^[/.-]|[/.]$|\.\.|\/\//.test(branch))) {
+          setError('Branch must be a valid git branch name (letters, digits, . _ - /)');
+          return false;
+        }
+      }
       return true;
     }
     if (agent.agent_type === 'sonarqube') {
@@ -1829,6 +2053,11 @@ const ExecuteAgentModal = ({ agent, agentType, onClose, onStart, hosts, initialV
               }
               if (isSonar && field.name !== 'mode') {
                 const allowed = SONAR_FIELDS_BY_MODE[executeData.mode || 'projects'] || [];
+                if (!allowed.includes(field.name)) return null;
+              }
+              // [BITBUCKET]
+              if (isBitbucket && field.name !== 'mode') {
+                const allowed = BITBUCKET_FIELDS_BY_MODE[executeData.mode || 'read'] || [];
                 if (!allowed.includes(field.name)) return null;
               }
               return (
@@ -2111,20 +2340,57 @@ const AgentRunDock = ({ runs, activeRunId, drawerOpen, onSelect, onMinimize, onD
 // ─────────────────────────────────────────────────────────────────────────────
 // HOSTS TAB
 // ─────────────────────────────────────────────────────────────────────────────
+// Protocol registry — single source of truth for the Hosts tab (labels, defaults, credential types)
+const HOST_PROTOCOLS = {
+  ssh:   { label: 'SSH',      icon: '🐧', color: '#6366f1', defaultPort: 22,   defaultCred: 'key',      namePh: 'linux-01',   userPh: 'debian',
+           credTypes: [['key', 'SSH key'], ['password', 'Password'], ['key+passphrase', 'SSH key + passphrase']] },
+  winrm: { label: 'WinRM',    icon: '🪟', color: '#0ea5e9', defaultPort: 5985, defaultCred: 'ntlm',     namePh: 'win-01',     userPh: 'Administrator',
+           credTypes: [['ntlm', 'NTLM'], ['kerberos', 'Kerberos'], ['password', 'Password']] },
+  psrp:  { label: 'PSRP',     icon: '⚡', color: '#14b8a6', defaultPort: 5985, defaultCred: 'ntlm',     namePh: 'win-psrp-01', userPh: 'Administrator',
+           credTypes: [['ntlm', 'NTLM'], ['negotiate', 'Negotiate'], ['kerberos', 'Kerberos'], ['credssp', 'CredSSP'], ['password', 'Password (basic)']] },
+  db:    { label: 'Database', icon: '🗄️', color: '#f59e0b', defaultPort: null, defaultCred: 'password', namePh: 'mysql-prod', userPh: 'monitor',
+           credTypes: [['password', 'Password']] },
+};
+const DB_TYPES = {
+  mysql:      { label: 'MySQL',          port: 3306 },
+  mariadb:    { label: 'MariaDB',        port: 3306 },
+  postgresql: { label: 'PostgreSQL',     port: 5432 },
+  mssql:      { label: 'SQL Server',     port: 1433 },
+};
+const PSRP_AUTH_METHODS = ['negotiate', 'ntlm', 'kerberos', 'basic', 'credssp'];
+const PSRP_AUTH_CRED_TYPES = ['ntlm', 'negotiate', 'kerberos', 'credssp'];   // credential_type that maps 1:1 to a transport
+const hostDefaultPort = (h) => h.port || (h.protocol === 'db' ? DB_TYPES[h.db_type]?.port : HOST_PROTOCOLS[h.protocol]?.defaultPort);
+
+const EMPTY_HOST_FORM = {
+  name: '', protocol: 'ssh', host: '', port: '', username: '', credential_type: 'key', password: '', key_content: '', key_passphrase: '',
+  winrm_transport: 'ntlm', winrm_server_cert_validation: 'ignore', db_type: 'mysql', db_name: '', tags: '', notes: ''
+};
+
 const HostsTab = ({ hosts, onRefresh }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editHost, setEditHost] = useState(null);
   const [testResults, setTestResults] = useState({});
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [form, setForm] = useState({ name: '', protocol: 'ssh', host: '', port: '', username: '', credential_type: 'key', password: '', key_content: '', key_passphrase: '', winrm_transport: 'ntlm', winrm_server_cert_validation: 'ignore', tags: '', notes: '' });
+  const [form, setForm] = useState(EMPTY_HOST_FORM);
 
-  const resetForm = () => setForm({ name: '', protocol: 'ssh', host: '', port: '', username: '', credential_type: 'key', password: '', key_content: '', key_passphrase: '', winrm_transport: 'ntlm', winrm_server_cert_validation: 'ignore', tags: '', notes: '' });
+  const resetForm = () => setForm(EMPTY_HOST_FORM);
   const openAdd = () => { resetForm(); setEditHost(null); setShowAddModal(true); };
   const openEdit = (h) => {
-    setForm({ name: h.name, protocol: h.protocol, host: h.host, port: h.port || '', username: h.username, credential_type: h.credential_type, password: '', key_content: '', key_passphrase: '', winrm_transport: h.winrm_transport || 'ntlm', winrm_server_cert_validation: h.winrm_server_cert_validation || 'ignore', tags: (h.tags || []).join(', '), notes: h.notes || '' });
+    setForm({ name: h.name, protocol: h.protocol, host: h.host, port: h.port || '', username: h.username, credential_type: h.credential_type, password: '', key_content: '', key_passphrase: '', winrm_transport: h.winrm_transport || 'ntlm', winrm_server_cert_validation: h.winrm_server_cert_validation || 'ignore', db_type: h.db_type || 'mysql', db_name: h.db_name || '', tags: (h.tags || []).join(', '), notes: h.notes || '' });
     setEditHost(h); setShowAddModal(true);
   };
+
+  const changeProtocol = (p) => setForm({ ...form, protocol: p, credential_type: HOST_PROTOCOLS[p].defaultCred, winrm_transport: 'ntlm', port: '' });
+  const changeCredentialType = (v) => setForm({ ...form, credential_type: v, ...(form.protocol === 'psrp' && PSRP_AUTH_CRED_TYPES.includes(v) ? { winrm_transport: v } : {}) });
+
+  const isWindowsProto = form.protocol === 'winrm' || form.protocol === 'psrp';
+  // Password input: db always; psrp unless Kerberos; ssh/winrm keep the historical rule
+  const showPassword = form.protocol === 'db'
+    || (form.protocol === 'psrp' ? form.winrm_transport !== 'kerberos' : (form.credential_type === 'password' || form.credential_type === 'ntlm'));
+  // Backend requires a password when creating psrp (non-Kerberos) and db hosts
+  const passwordRequired = !editHost && showPassword && (form.protocol === 'db' || form.protocol === 'psrp');
+  const portPlaceholder = String((form.protocol === 'db' ? DB_TYPES[form.db_type]?.port : HOST_PROTOCOLS[form.protocol]?.defaultPort) || '');
 
   const handleSave = async () => {
     try {
@@ -2132,11 +2398,15 @@ const HostsTab = ({ hosts, onRefresh }) => {
       if (form.password) payload.password = form.password;
       if (form.key_content) payload.key_content = form.key_content;
       if (form.key_passphrase) payload.key_passphrase = form.key_passphrase;
-      if (form.protocol === 'winrm') { payload.winrm_transport = form.winrm_transport; payload.winrm_server_cert_validation = form.winrm_server_cert_validation; }
+      if (isWindowsProto) { payload.winrm_transport = form.winrm_transport; payload.winrm_server_cert_validation = form.winrm_server_cert_validation; }
+      if (form.protocol === 'db') { payload.db_type = form.db_type; if (form.db_name) payload.db_name = form.db_name; }
       if (editHost) { await api.put(`/api/hosts/${editHost.id}`, payload); setSuccess('Host updated successfully'); }
       else { await api.post('/api/hosts/', payload); setSuccess('Host added successfully'); }
       setShowAddModal(false); resetForm(); onRefresh(); setTimeout(() => setSuccess(null), 3000);
-    } catch (err) { setError(err.response?.data?.detail || 'Failed to save host'); }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(Array.isArray(detail) ? detail.map(d => d.msg).join(' · ') : (detail || 'Failed to save host'));
+    }
   };
 
   const handleTest = async (hostId) => {
@@ -2151,7 +2421,7 @@ const HostsTab = ({ hosts, onRefresh }) => {
     catch (err) { setError(err.response?.data?.detail || 'Failed to delete host'); }
   };
 
-  const protocolIcon = (p) => p === 'ssh' ? '🐧' : '🪟';
+  const protocolIcon = (p) => HOST_PROTOCOLS[p]?.icon || '🖥️';
 
   return (
     <div>
@@ -2172,13 +2442,14 @@ const HostsTab = ({ hosts, onRefresh }) => {
           {hosts.map(h => {
             const tr = testResults[h.id];
             return (
-              <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '28px 1fr auto auto', alignItems: 'center', gap: 'var(--spacing-3)', padding: 'var(--spacing-3) var(--spacing-4)', background: 'var(--bg-card)', border: '1px solid var(--gray-200)', borderLeft: `3px solid ${h.protocol === 'ssh' ? '#6366f1' : '#0ea5e9'}`, borderRadius: 'var(--radius-md)', opacity: h.is_active ? 1 : 0.6 }}>
+              <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '28px 1fr auto auto', alignItems: 'center', gap: 'var(--spacing-3)', padding: 'var(--spacing-3) var(--spacing-4)', background: 'var(--bg-card)', border: '1px solid var(--gray-200)', borderLeft: `3px solid ${HOST_PROTOCOLS[h.protocol]?.color || '#6366f1'}`, borderRadius: 'var(--radius-md)', opacity: h.is_active ? 1 : 0.6 }}>
                 <div style={{ fontSize: '18px', textAlign: 'center' }}>{protocolIcon(h.protocol)}</div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)' }}>{h.name}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', flexWrap: 'wrap', marginTop: '3px' }}>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)' }}>{h.host}:{h.port || (h.protocol === 'ssh' ? 22 : 5985)}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)' }}>{h.host}:{hostDefaultPort(h) || '—'}</span>
                     <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '99px', background: 'var(--gray-200)', color: 'var(--gray-700)' }}>{h.protocol}</span>
+                    {h.protocol === 'db' && h.db_type && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '99px', background: 'var(--gray-200)', color: 'var(--gray-700)' }}>{h.db_type}{h.db_name ? `/${h.db_name}` : ''}</span>}
                     <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '99px', background: 'var(--gray-200)', color: 'var(--gray-700)' }}>{h.credential_type}</span>
                     {(h.tags || []).map(tag => <span key={tag} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '99px', background: 'var(--gray-200)', color: 'var(--gray-700)' }}>{tag}</span>)}
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: h.is_active ? 'var(--success)' : 'var(--gray-500)' }}>
@@ -2211,19 +2482,35 @@ const HostsTab = ({ hosts, onRefresh }) => {
           <div className="card" style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflow: 'auto' }}>
             <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '600', marginBottom: 'var(--spacing-4)' }}>{editHost ? `Edit host — ${editHost.name}` : 'Add remote host'}</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
-              <div className="form-group"><label className="form-label">Host name *</label><input type="text" className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="linux-01" disabled={!!editHost} /></div>
-              <div className="form-group"><label className="form-label">Protocol *</label><select className="form-input" value={form.protocol} onChange={e => setForm({ ...form, protocol: e.target.value, credential_type: e.target.value === 'winrm' ? 'ntlm' : 'key' })}><option value="ssh">SSH</option><option value="winrm">WinRM</option></select></div>
+              <div className="form-group"><label className="form-label">Host name *</label><input type="text" className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={HOST_PROTOCOLS[form.protocol].namePh} disabled={!!editHost} /></div>
+              <div className="form-group">
+                <label className="form-label">Protocol *</label>
+                <select className="form-input" value={form.protocol} onChange={e => changeProtocol(e.target.value)} disabled={!!editHost}>
+                  {Object.entries(HOST_PROTOCOLS).map(([key, p]) => <option key={key} value={key}>{p.label}</option>)}
+                </select>
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
               <div className="form-group"><label className="form-label">IP / Hostname *</label><input type="text" className="form-input" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} placeholder="192.168.1.85" /></div>
-              <div className="form-group" style={{ width: '100px' }}><label className="form-label">Port</label><input type="number" className="form-input" value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} placeholder={form.protocol === 'ssh' ? '22' : '5985'} /></div>
+              <div className="form-group" style={{ width: '100px' }}><label className="form-label">Port</label><input type="number" className="form-input" value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} placeholder={portPlaceholder} /></div>
             </div>
+            {form.protocol === 'db' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
+                <div className="form-group">
+                  <label className="form-label">Database engine *</label>
+                  <select className="form-input" value={form.db_type} onChange={e => setForm({ ...form, db_type: e.target.value })}>
+                    {Object.entries(DB_TYPES).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group"><label className="form-label">Default database <span style={{ color: 'var(--gray-500)', fontSize: 'var(--text-xs)' }}>(optional)</span></label><input type="text" className="form-input" value={form.db_name} onChange={e => setForm({ ...form, db_name: e.target.value })} placeholder="appdb" /></div>
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
-              <div className="form-group"><label className="form-label">Username *</label><input type="text" className="form-input" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder={form.protocol === 'ssh' ? 'debian' : 'Administrator'} /></div>
+              <div className="form-group"><label className="form-label">Username *</label><input type="text" className="form-input" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder={HOST_PROTOCOLS[form.protocol].userPh} /></div>
               <div className="form-group">
                 <label className="form-label">Credential type *</label>
-                <select className="form-input" value={form.credential_type} onChange={e => setForm({ ...form, credential_type: e.target.value })}>
-                  {form.protocol === 'ssh' ? (<><option value="key">SSH key</option><option value="password">Password</option><option value="key+passphrase">SSH key + passphrase</option></>) : (<><option value="ntlm">NTLM</option><option value="kerberos">Kerberos</option><option value="password">Password</option></>)}
+                <select className="form-input" value={form.credential_type} onChange={e => changeCredentialType(e.target.value)}>
+                  {HOST_PROTOCOLS[form.protocol].credTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
             </div>
@@ -2239,21 +2526,26 @@ const HostsTab = ({ hosts, onRefresh }) => {
                 <input type="password" className="form-input" value={form.key_passphrase} onChange={e => setForm({ ...form, key_passphrase: e.target.value })} placeholder="Passphrase for private key" />
               </div>
             )}
-            {(form.credential_type === 'password' || form.credential_type === 'ntlm') && (
+            {showPassword && (
               <div className="form-group" style={{ marginBottom: 'var(--spacing-3)' }}>
-                <label className="form-label">Password {editHost ? '— leave empty to keep current' : '*'}</label>
-                <input type="password" className="form-input" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Password" />
+                <label className="form-label">Password {editHost ? '— leave empty to keep current' : (passwordRequired ? '*' : '')}</label>
+                <input type="password" className="form-input" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Password" autoComplete="new-password" />
               </div>
             )}
-            {form.protocol === 'winrm' && (
+            {isWindowsProto && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
-                <div className="form-group"><label className="form-label">WinRM transport</label><select className="form-input" value={form.winrm_transport} onChange={e => setForm({ ...form, winrm_transport: e.target.value })}><option value="ntlm">ntlm</option><option value="basic">basic</option><option value="kerberos">kerberos</option></select></div>
+                <div className="form-group">
+                  <label className="form-label">{form.protocol === 'psrp' ? 'PSRP auth method' : 'WinRM transport'}</label>
+                  <select className="form-input" value={form.winrm_transport} onChange={e => setForm({ ...form, winrm_transport: e.target.value })}>
+                    {(form.protocol === 'psrp' ? PSRP_AUTH_METHODS : ['ntlm', 'basic', 'kerberos']).map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
                 <div className="form-group"><label className="form-label">Certificate validation</label><select className="form-input" value={form.winrm_server_cert_validation} onChange={e => setForm({ ...form, winrm_server_cert_validation: e.target.value })}><option value="ignore">ignore</option><option value="validate">validate</option></select></div>
               </div>
             )}
             <div className="form-group" style={{ marginBottom: 'var(--spacing-3)' }}>
               <label className="form-label">Tags <span style={{ color: 'var(--gray-500)', fontSize: 'var(--text-xs)' }}>(comma-separated)</span></label>
-              <input type="text" className="form-input" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder="linux, prod, web" />
+              <input type="text" className="form-input" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder={form.protocol === 'db' ? 'db, mysql, prod' : 'linux, prod, web'} />
             </div>
             <div className="form-group" style={{ marginBottom: 'var(--spacing-4)' }}>
               <label className="form-label">Notes</label>
@@ -2261,10 +2553,11 @@ const HostsTab = ({ hosts, onRefresh }) => {
             </div>
             <div style={{ padding: 'var(--spacing-3)', border: '1px solid var(--warning)', borderLeft: '3px solid var(--warning)', borderRadius: 'var(--radius)', backgroundColor: 'rgba(251,191,36,0.06)', marginBottom: 'var(--spacing-4)', fontSize: 'var(--text-xs)', color: 'var(--gray-700)', lineHeight: '1.6' }}>
               <strong style={{ color: 'var(--warning-dark)' }}>🔒 Credentials are encrypted immediately</strong> and never returned in API responses. After saving, use the <strong>Test</strong> button to verify connectivity.
+              {form.protocol === 'db' && <> Use a dedicated least-privilege database account: read-only statements are enforced by the MCP, but the account grants are the real safeguard.</>}
             </div>
             <div style={{ display: 'flex', gap: 'var(--spacing-3)', justifyContent: 'flex-end', paddingTop: 'var(--spacing-4)', borderTop: '1px solid var(--gray-200)' }}>
               <Button variant="ghost" onClick={() => { setShowAddModal(false); resetForm(); }}>Cancel</Button>
-              <Button variant="primary" onClick={handleSave} disabled={!form.name || !form.host || !form.username}>{editHost ? 'Update host' : 'Save host'}</Button>
+              <Button variant="primary" onClick={handleSave} disabled={!form.name || !form.host || !form.username || (passwordRequired && !form.password)}>{editHost ? 'Update host' : 'Save host'}</Button>
             </div>
           </div>
         </div>
@@ -2839,6 +3132,11 @@ const Agents = () => {
 
                   {selectedAgentType === 'sonarqube' && (
                     <SonarQubeConfigFields formData={formData} updateConfigField={updateConfigField} />
+                  )}
+
+                  {/* [BITBUCKET] */}
+                  {selectedAgentType === 'bitbucket' && (
+                    <BitbucketConfigFields formData={formData} updateConfigField={updateConfigField} />
                   )}
 
                   {/* [WEBSEARCH] */}

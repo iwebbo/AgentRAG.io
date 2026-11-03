@@ -326,6 +326,48 @@ AGENT_INPUT_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Gitea Branch Generator",
         "fields": _branch_generator_fields(),
     },
+    "bitbucket": {
+        "label": "Bitbucket Assistant",
+        "fields": [
+            _f("mode", "Mode", "select", required=True, default="read", options=[
+                ("read", "read — load file/folder/repo + LLM analysis"),
+                ("pull_request", "pull_request — LLM review of a pull request"),
+                ("write", "write — LLM edit of a file, commit on a branch"),
+            ]),
+            _f("url", "Bitbucket URL", placeholder="https://bitbucket.example.com/projects/PROJ/repos/my-repo/browse/path?at=main",
+               help="Browse, pull-request or clone URL. Alternative: project + repo below"),
+            _f("project", "Project key (if no URL)", placeholder="PROJ"),
+            _f("repo", "Repository slug (if no URL)", placeholder="my-repo"),
+            _f("path", "File or folder path", placeholder="charts/app/values.yaml",
+               show_when={"mode": ["read", "write"]},
+               required_when={"mode": ["write"]},
+               help="Empty = repository root (read). Required for write unless it is in the URL"),
+            _f("ref", "Branch / tag / commit (optional)", placeholder="main",
+               show_when={"mode": ["read", "write"]}),
+            _f("pr_id", "Pull request ID", "number", min=1, max=1000000,
+               show_when={"mode": ["pull_request"]},
+               help="Not needed if the URL points to a pull request"),
+            _f("question", "Question (optional)", placeholder="How is the Helm chart structured?",
+               show_when={"mode": ["read"]}),
+            _f("post_comment", "Post the review as a PR comment", "checkbox", default=False,
+               show_when={"mode": ["pull_request"]}),
+            _f("instruction", "Edit instruction", "textarea",
+               placeholder="Bump the image tag to 1.4.2 and add resource limits...",
+               show_when={"mode": ["write"]}, required_when={"mode": ["write"]}),
+            _f("branch", "Target branch (optional)", placeholder="feature/ai-update",
+               show_when={"mode": ["write"]},
+               help="Empty = auto-generated mcp/<timestamp>-<file> branch. Push to the default branch is refused"),
+            _f("commit_message", "Commit message (optional)", placeholder="chore: update values.yaml",
+               show_when={"mode": ["write"]}),
+            _f("open_pr", "Open a pull request after the commit", "checkbox", default=False,
+               show_when={"mode": ["write"]}),
+            _f("pr_title", "Pull request title (optional)", placeholder="chore: update values.yaml",
+               show_when={"mode": ["write"]}),
+        ],
+        "one_of": [
+            {"when": {"mode": ["read", "pull_request", "write"]}, "fields": ["url", "repo"]},
+        ],
+    },
 }
 
 
@@ -530,6 +572,23 @@ def build_manifest(
         if cleaned_input.get("create_pr", cfg.get("auto_create_pr")):
             label += " and open a pull request"
         return [_action(WRITE_EXTERNAL, label)]
+    if agent_type == "bitbucket":
+        target = cleaned_input.get("url") or (
+            f"{cleaned_input.get('project', '?')}/{cleaned_input.get('repo', '?')}"
+        )
+        if mode == "write":
+            label = (
+                f"Edit '{cleaned_input.get('path', '?')}' on Bitbucket ({target}) "
+                f"and commit it to branch '{cleaned_input.get('branch') or 'auto-generated'}'"
+            )
+            if cleaned_input.get("open_pr"):
+                label += " and open a pull request"
+            return [_action(WRITE_EXTERNAL, label)]
+        if mode == "pull_request":
+            if cleaned_input.get("post_comment"):
+                return [_action(WRITE_EXTERNAL, f"Review the Bitbucket pull request ({target}) and post a comment")]
+            return [_action(READ_EXTERNAL, f"Read the Bitbucket pull request ({target}), review not posted")]
+        return [_action(READ_EXTERNAL, f"Read Bitbucket (read-only): {target}")]
     return [_action(INTERNAL, "LLM analysis (no external action)")]
 
 
