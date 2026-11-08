@@ -6,7 +6,7 @@
 
 ---
 
-## 🔑 Authentication & Setup
+## Authentication & Setup
 
 Before interacting with any API endpoint, an access token must be obtained using the dedicated login endpoint. This token is required in the `Authorization` header for all subsequent requests.
 
@@ -32,7 +32,7 @@ echo "TOKEN=$TOKEN"
 
 ---
 
-## 💾 Database Host Management (Hosts)
+##  Database Host Management (Hosts)
 
 This section details how to register and test connections to various database instances.
 
@@ -158,7 +158,7 @@ curl -sk -X POST "$BASE/api/skills/register" \
 
 ---
 
-## 🚀 Agent Execution Workflow
+##  Agent Execution Workflow
 
 This final step executes the registered agent against a specific host, allowing the LLM to interpret the request and generate the appropriate SQL query using the defined skill mapping.
 

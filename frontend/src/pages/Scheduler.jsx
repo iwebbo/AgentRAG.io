@@ -1254,7 +1254,7 @@ export default function Scheduler() {
 
   return (
     <Layout>
-      <div style={{ padding: 'var(--spacing-6)', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="page">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-5)' }}>
           <div>
             <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, marginBottom: 'var(--spacing-1)' }}>Scheduler</h1>

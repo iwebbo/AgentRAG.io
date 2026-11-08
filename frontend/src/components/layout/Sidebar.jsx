@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, MessageSquare, Server, FileText,
-  Settings, LogOut, FolderKanban, CalendarClock, Bot, Moon, Sun,
+  Settings, LogOut, FolderKanban, CalendarClock, Bot, Moon, Sun, Workflow
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
@@ -13,6 +13,7 @@ const menuItems = [
   { path: '/chat',      label: 'Chat',      icon: MessageSquare   },
   { path: '/projects',  label: 'Projects',  icon: FolderKanban    },
   { path: '/agents',    label: 'Agents',    icon: Bot             },
+  { path: '/workflows',  label: 'Workflow', icon: Workflow        },
   { path: '/scheduler', label: 'Scheduler', icon: CalendarClock   },
   { path: '/providers', label: 'Providers', icon: Server          },
   { path: '/templates', label: 'Templates', icon: FileText        },

@@ -360,7 +360,7 @@ const Providers = () => {
 
   return (
     <Layout>
-      <div style={{ padding: 'var(--spacing-8) var(--spacing-6)', maxWidth: '1100px', margin: '0 auto' }}>
+      <div className="page">
 
         {/* Alert */}
         {alert && (

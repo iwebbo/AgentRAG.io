@@ -9,6 +9,7 @@ import Settings from './pages/Settings';
 import Templates from './pages/Templates';
 import Projects from './pages/Projects';
 import Agents from './pages/Agents';
+import Workflows from './pages/Workflows';
 import Scheduler from './pages/Scheduler';
 import RAGChat from './pages/RAGChat';
 import Documents from './pages/Documents';
@@ -60,7 +61,8 @@ function App() {
           }
         />
         <Route
-          path="/projects/:projectId/chat"          element={
+          path="/projects/:projectId/chat"
+          element={
             <PrivateRoute>
               <RAGChat />
             </PrivateRoute>
@@ -87,6 +89,14 @@ function App() {
           element={
             <PrivateRoute>
               <Agents />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/workflows"
+          element={
+            <PrivateRoute>
+              <Workflows />
             </PrivateRoute>
           }
         />

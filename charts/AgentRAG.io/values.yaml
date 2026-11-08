@@ -41,7 +41,11 @@ backend:
     - name: VERIFY_MAX_ROUNDS
       value: "2"
     - name: RAG_MIN_SCORE
-      value: "0.25"
+      value: "0.20"
+    - name: EMBEDDING_MODEL
+      value: "jinaai/jina-embeddings-v2-base-code"
+    - name: EMBEDDING_MAX_SEQ_LENGTH
+      value: "1024"
 
 # Scheduler worker
 scheduler:

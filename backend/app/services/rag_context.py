@@ -10,6 +10,7 @@ from typing import Optional
 from uuid import UUID
 
 from app.services.context_budget import count_tokens
+from app.services.rag_selection import SelectionConfig, select_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -27,36 +28,49 @@ class QueryType(Enum):
     SIMPLE = "simple"
 
 
+# top_k / context_ratio = plafonds de récupération et de budget.
+# max_chunks / rel_drop = sélection par pertinence (voir rag_selection.py) : le contexte
+# envoyé au LLM est dimensionné par la pertinence, ces plafonds ne sont plus une cible à remplir.
 RAG_STRATEGIES = {
     QueryType.ARCHITECTURE: {
         "description": "Vue globale projet",
         "top_k": 50,
         "context_ratio": 0.5,  # 50% du contexte disponible
-        "include_index": True
+        "include_index": True,
+        "max_chunks": 20,
+        "rel_drop": 0.25,      # vue globale : on accepte des chunks plus éloignés du meilleur
     },
     QueryType.CODE_GEN: {
         "description": "Génération de code",
         "top_k": 60,
         "context_ratio": 0.5,
-        "include_index": True
+        "include_index": True,
+        "max_chunks": 15,
+        "rel_drop": 0.20,
     },
     QueryType.DEBUG: {
         "description": "Debug/Fix",
         "top_k": 50,
         "context_ratio": 0.5,
-        "include_index": False
+        "include_index": False,
+        "max_chunks": 10,
+        "rel_drop": 0.15,
     },
     QueryType.FEATURE: {
         "description": "Nouvelle fonctionnalité",
         "top_k": 50,
         "context_ratio": 0.5,
-        "include_index": True
+        "include_index": True,
+        "max_chunks": 15,
+        "rel_drop": 0.20,
     },
     QueryType.SIMPLE: {
         "description": "Question simple",
         "top_k": 50,
         "context_ratio": 0.5,
-        "include_index": False
+        "include_index": False,
+        "max_chunks": 8,
+        "rel_drop": 0.15,
     }
 }
 
@@ -220,8 +234,14 @@ class RagContext:
     tokens: int = 0
 
 
-def build_rag_context(project_id: UUID, strategy: dict, results: dict, max_tokens: int) -> RagContext:
-    """Assemble index projet + chunks récupérés, dans la limite de `max_tokens`."""
+def build_rag_context(
+    project_id: UUID,
+    strategy: dict,
+    results: dict,
+    max_tokens: int,
+    selection: Optional[SelectionConfig] = None,
+) -> RagContext:
+    """Assemble index projet + chunks pertinents (voir rag_selection), dans la limite de `max_tokens`."""
     parts: list[str] = []
     chunks: list[dict] = []
     tokens = 0
@@ -234,23 +254,24 @@ def build_rag_context(project_id: UUID, strategy: dict, results: dict, max_token
             logger.info(f"📇 Index projet ajouté: {tokens} tokens")
 
     if results['documents'][0]:
-        found = len(results['documents'][0])
-        logger.info(f" Found {found} chunks")
+        # Sélection par pertinence (seuil + coupure relative au meilleur score), pas remplissage du budget
+        selected, stats = select_chunks(results, selection or SelectionConfig.from_env(strategy))
+        found = stats["total"]
+        logger.info(
+            f" RAG selection: {stats['kept']}/{found} chunks kept "
+            f"(best={stats['best']:.3f}, floor={stats['floor']:.3f}, selection={'on' if stats['enabled'] else 'off'})"
+        )
         parts.append("\n#  DOCUMENTS PERTINENTS\n")
 
-        for i, (doc, metadata, distance) in enumerate(zip(
-            results['documents'][0],
-            results['metadatas'][0],
-            results['distances'][0]
-        )):
+        for i, (doc, metadata, score) in enumerate(selected):
             chunk_text = f"\n## [SOURCE {i+1}] {metadata.get('filename', 'unknown')}\n```\n{doc}\n```"
             chunk_tokens = count_tokens(chunk_text)
 
             if tokens + chunk_tokens > max_tokens:
-                logger.warning(f" RAG context truncated at {tokens} tokens ({i}/{found} chunks)")
+                logger.warning(f" RAG context truncated at {tokens} tokens ({i}/{len(selected)} chunks)")
                 break
 
-            chunks.append({"text": doc, "metadata": metadata, "score": 1 - distance})
+            chunks.append({"text": doc, "metadata": metadata, "score": score})
             parts.append(chunk_text)
             tokens += chunk_tokens
     else:

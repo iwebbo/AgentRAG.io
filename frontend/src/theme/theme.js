@@ -1,23 +1,49 @@
 // Gestion du thème (dark par défaut), persistance dans localStorage('app-theme').
+// Thèmes : dark | light | glass (clair) | glass-dark.
 // Même clé que le template : réutilisable à l'identique dans les futures apps.
 import { useCallback, useEffect, useState } from 'react';
 
 const KEY = 'app-theme';
-const THEMES = ['dark', 'light'];
 const EVENT = 'app-theme-change';
+const DEFAULT_THEME = 'dark';
+
+export const THEMES = ['dark', 'light', 'glass', 'glass-dark'];
+
+export const THEME_LABELS = {
+  dark: 'Dark',
+  light: 'Light',
+  glass: 'Glass',
+  'glass-dark': 'Glass Dark',
+};
+
+// Couleur de la barre du navigateur mobile (<meta name="theme-color">)
+const THEME_COLORS = {
+  dark: '#09090b',
+  light: '#f8fafc',
+  glass: '#F3F5FB',
+  'glass-dark': '#151B2F',
+};
+
+const isTheme = (v) => THEMES.includes(v);
 
 const safeGet = () => {
   try {
     const v = localStorage.getItem(KEY);
-    return THEMES.includes(v) ? v : 'dark';
+    return isTheme(v) ? v : DEFAULT_THEME;
   } catch (_) {
-    return 'dark';
+    return DEFAULT_THEME;
   }
 };
 
+const syncMetaColor = (theme) => {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', THEME_COLORS[theme]);
+};
+
 export const applyTheme = (theme) => {
-  const next = THEMES.includes(theme) ? theme : 'dark';
+  const next = isTheme(theme) ? theme : DEFAULT_THEME;
   document.documentElement.setAttribute('data-theme', next);
+  syncMetaColor(next);
   try {
     localStorage.setItem(KEY, next);
   } catch (_) {
@@ -28,11 +54,16 @@ export const applyTheme = (theme) => {
 };
 
 export const initTheme = () => {
-  document.documentElement.setAttribute('data-theme', safeGet());
+  const theme = safeGet();
+  document.documentElement.setAttribute('data-theme', theme);
+  syncMetaColor(theme);
 };
 
 export const useTheme = () => {
-  const [theme, setThemeState] = useState(() => document.documentElement.getAttribute('data-theme') || safeGet());
+  const [theme, setThemeState] = useState(() => {
+    const attr = document.documentElement.getAttribute('data-theme');
+    return isTheme(attr) ? attr : safeGet();
+  });
 
   useEffect(() => {
     const onChange = (e) => setThemeState(e.detail);
@@ -41,7 +72,12 @@ export const useTheme = () => {
   }, []);
 
   const setTheme = useCallback((t) => setThemeState(applyTheme(t)), []);
-  const toggleTheme = useCallback(() => setThemeState(applyTheme(theme === 'dark' ? 'light' : 'dark')), [theme]);
 
-  return { theme, setTheme, toggleTheme };
+  // Cycle sur tous les thèmes : dark → light → glass → glass-dark → dark
+  const toggleTheme = useCallback(() => {
+    const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    setThemeState(applyTheme(next));
+  }, [theme]);
+
+  return { theme, themes: THEMES, setTheme, toggleTheme };
 };

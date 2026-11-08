@@ -10,9 +10,15 @@ import logging
 from pathlib import Path
 import os 
 
+from app.services.embedding_config import configured_model_name
+
 logger = logging.getLogger(__name__)
 
 CHROMA_BATCH_SIZE = 500
+
+
+class EmbeddingMismatchError(ValueError):
+    """Les vecteurs fournis ne correspondent pas à l'index (modèle ou dimension différents) : réindexer."""
 
 
 # ── ChromaDB Backend ──────────────────────────────────────────────────────────
@@ -58,15 +64,45 @@ class ChromaBackend:
     def _collection_name(self, project_id: str) -> str:
         return f"project_{project_id}".replace("-", "_")
 
-    def get_or_create_collection(self, project_id: str):
-        return self.client.get_or_create_collection(
+    def _open(self, project_id: str, check: bool = False):
+        """
+        Ouvre (ou crée) la collection du projet.
+
+        embedding_function=None : ChromaDB ne calcule JAMAIS de vecteur. Tous les vecteurs viennent
+        d'EmbeddingManager (embeddings.py) ; un add() sans `embeddings` échoue au lieu de se rabattre
+        en silence sur l'ONNX MiniLM de Chroma.
+
+        À la création, la collection est étiquetée avec le modèle d'embedding courant (ChromaDB ignore les
+        métadonnées passées sur une collection existante : l'étiquette ne change donc jamais). Avec
+        check=True, on refuse d'écrire ou de lire une collection indexée par un autre modèle.
+        """
+        col = self.client.get_or_create_collection(
             name=self._collection_name(project_id),
             metadata={
                 "hnsw:space": "cosine",
                 "hnsw:construction_ef": 200,
-                "hnsw:search_ef": 100
-            }
+                "hnsw:search_ef": 100,
+                "embedding_model": configured_model_name(),
+            },
+            embedding_function=None,
         )
+        if check:
+            self._check_compatible(col)
+        return col
+
+    @staticmethod
+    def _check_compatible(col) -> None:
+        indexed_with = (col.metadata or {}).get("embedding_model")
+        current = configured_model_name()
+        if indexed_with and indexed_with != current:
+            raise EmbeddingMismatchError(
+                f"La collection '{col.name}' a été indexée avec le modèle '{indexed_with}' alors que "
+                f"l'application utilise '{current}'. Réindexez le projet (supprimez ses documents puis "
+                f"renvoyez-les) ou rétablissez EMBEDDING_MODEL={indexed_with}."
+            )
+
+    def get_or_create_collection(self, project_id: str):
+        return self._open(project_id)
 
     def add_documents(
         self,
@@ -76,15 +112,20 @@ class ChromaBackend:
         ids: List[str],
         embeddings: Optional[List[List[float]]] = None
     ):
-        col = self.get_or_create_collection(project_id)
+        if not embeddings or len(embeddings) != len(documents):
+            raise ValueError(
+                "ChromaDB : `embeddings` est obligatoire et doit contenir un vecteur par document "
+                "(calculez-les avec EmbeddingManager ; l'embedding par défaut de Chroma est désactivé)."
+            )
+        col = self._open(project_id, check=True)
         for i in range(0, len(documents), CHROMA_BATCH_SIZE):
             batch = slice(i, i + CHROMA_BATCH_SIZE)
-            kwargs: Dict[str, Any] = dict(
-                documents=documents[batch], metadatas=metadatas[batch], ids=ids[batch]
+            col.add(
+                documents=documents[batch],
+                metadatas=metadatas[batch],
+                ids=ids[batch],
+                embeddings=embeddings[batch],
             )
-            if embeddings:
-                kwargs["embeddings"] = embeddings[batch]
-            col.add(**kwargs)
         logger.info(f"✅ ChromaDB: {len(documents)} chunks added to project {project_id}")
 
     def query(
@@ -94,7 +135,7 @@ class ChromaBackend:
         n_results: int = 5,
         where: Optional[Dict] = None
     ) -> Dict:
-        col = self.get_or_create_collection(project_id)
+        col = self._open(project_id, check=True)
         return col.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
@@ -189,6 +230,15 @@ class OpenSearchBackend:
             },
         }
 
+    def _check_dimension(self, vector: List[float]) -> None:
+        expected = int(self.embedding_dim)
+        if len(vector) != expected:
+            raise EmbeddingMismatchError(
+                f"OpenSearch attend des vecteurs de dimension {expected} (OPENSEARCH_EMBEDDING_DIM) mais le modèle "
+                f"d'embedding '{configured_model_name()}' en produit {len(vector)}. Alignez OPENSEARCH_EMBEDDING_DIM "
+                f"sur le modèle et recréez l'index."
+            )
+
     def get_or_create_index(
         self, project_id: str, custom_index: Optional[str] = None
     ) -> str:
@@ -242,6 +292,12 @@ class OpenSearchBackend:
     ):
         from opensearchpy.helpers import bulk
 
+        if not embeddings or len(embeddings) != len(documents):
+            raise ValueError(
+                "OpenSearch : `embeddings` est obligatoire et doit contenir un vecteur par document "
+                "(calculez-les avec EmbeddingManager)."
+            )
+        self._check_dimension(embeddings[0])
         index = self.get_or_create_index(project_id, custom_index)
         actions = []
         for i, (doc, meta, doc_id) in enumerate(zip(documents, metadatas, ids)):
@@ -271,6 +327,7 @@ class OpenSearchBackend:
         where: Optional[Dict] = None,
         custom_index: Optional[str] = None,
     ) -> Dict:
+        self._check_dimension(query_embedding)
         index = self._index_name(project_id, custom_index)
         empty = {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
         try:
@@ -418,6 +475,11 @@ class VectorStore:
         vector_store_type: str = "chroma",
         opensearch_index: Optional[str] = None,
     ):
+        if not embeddings or len(embeddings) != len(documents):
+            raise ValueError(
+                "add_documents : `embeddings` est obligatoire (un vecteur par document, calculé avec "
+                "EmbeddingManager). Aucun backend ne calcule d'embedding par défaut."
+            )
         use_c, use_os = self._resolve(vector_store_type)
         if use_c:
             self._chroma.add_documents(project_id, documents, metadatas, ids, embeddings)

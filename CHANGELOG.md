@@ -1,29 +1,27 @@
 # AgentRAG.io Changelog
 
-## Version v1.1.93 - [03/11/2026]
+## Version v1.1.98 - [06/11/2026]
 
-Adds RAG (Retrieval-Augmented Generation) feature with comprehensive context management services for chat reviews.
+This update significantly enhances embedding capabilities by integrating new services and configuration logic.
 
 ---
 
 ### New Features & Enhancements
 
-#### RAG Context Management
-Implements retrieval-augmented generation context handling through new service modules.
+#### Enhanced Embedding Service
+The core embedding functionality has been updated to improve performance and integrate external codebases, specifically related to Jina.
 
-*   **rag_context.py:** New RAG-specific context management service
-*   **conversation_context.py:** Conversation state tracking for chat sessions
+*   **Updated embeddings service:** Modified `backend/app/services/embeddings.py` for enhanced logic.
+*   **New configuration file:** Added `backend/app/services/embedding_config.py` to manage embedding settings.
 
-#### Chat Review Improvements
-Enhances chat review functionality with improved context handling.
+#### Improved Vector Store Management
+Vector store handling and synchronization processes have been updated.
 
-*   **chat.py routes:** Updated chat route handlers for RAG integration
-*   **rag_chat.py routes:** New RAG-specific chat endpoint implementation
+*   **Updated vector store logic:** Modified `backend/app/services/vector_store.py` for better data management.
+*   **Sync manager updates:** Changed `backend/app/services/sync_manager.py` to improve synchronization processes.
 
-#### Context Budget & Limits
-Adds model limits and context budget tracking services.
+#### Embedding Model Baking Script
+A new script has been introduced to facilitate the creation and preparation of embedding models.
 
-*   **context_budget.py:** Service for managing context token budgets
-*   **model_limits.py:** Service for enforcing model usage limits
+*   **New model baking tool:** Added `backend/scripts/bake_embedding_models.py` for preparing embedding models.
 
----

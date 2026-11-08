@@ -150,8 +150,6 @@ const Projects = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    chunk_size: 2000,
-    chunk_overlap: 200,
     vector_store_type: 'chroma',
     opensearch_index: '',
   });
@@ -267,7 +265,7 @@ const Projects = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '', chunk_size: 2000, chunk_overlap: 200, vector_store_type: 'chroma', opensearch_index: '' });
+    setFormData({ name: '', description: '', vector_store_type: 'chroma', opensearch_index: '' });
     setOsHealthOk(null);
     setOsIndices([]);
     setOsIndexInput('');
@@ -286,7 +284,7 @@ const Projects = () => {
 
   return (
     <Layout>
-      <div style={{ padding: 'var(--spacing-8) var(--spacing-6)', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="page">
 
         {/* Alert */}
         {alert && (
@@ -570,28 +568,6 @@ const Projects = () => {
                     placeholder="What is this project about?"
                     rows={2}
                   />
-                </div>
-
-                {/* Chunk settings */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-                  <div className="form-group">
-                    <label className="form-label">Chunk size <span style={{ color: 'var(--gray-400)', fontWeight: '400' }}>tokens</span></label>
-                    <input
-                      type="number" className="form-input"
-                      value={formData.chunk_size}
-                      onChange={e => setFormData({ ...formData, chunk_size: parseInt(e.target.value) })}
-                      min="500" max="8000"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Chunk overlap</label>
-                    <input
-                      type="number" className="form-input"
-                      value={formData.chunk_overlap}
-                      onChange={e => setFormData({ ...formData, chunk_overlap: parseInt(e.target.value) })}
-                      min="0" max="1000"
-                    />
-                  </div>
                 </div>
 
                 {/* Vector store selector */}

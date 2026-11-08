@@ -1,5 +1,6 @@
 /* ==========================================================================
    Design tokens — Muted Minimalist (template perso/pro, réutilisable)
+   Thèmes : dark (défaut) | light | glass | glass-dark
    Ce fichier est volontairement générique : copiez-le tel quel dans les
    futures applications, seuls les composants (assets/styles/main.css) varient.
    ========================================================================== */
@@ -15,6 +16,12 @@
   --sidebar-w: 56px;
   --sidebar-w-open: 216px;
   --topbar-h: 48px;
+
+  /* Hooks de thème (neutres hors glass) */
+  --bg-app: var(--bg-main);     /* fond de .app-layout / .topbar (transparent en glass) */
+  --bg-input: var(--bg-main);   /* fond des champs de formulaire */
+  --page-bg: var(--bg-main);    /* fond de page (dégradés en glass) */
+  --glass-blur: none;           /* backdrop-filter des surfaces */
 }
 
 /* ---- Thème sombre (défaut) ------------------------------------------------ */
@@ -124,6 +131,136 @@
   --gray-900: #0f172a;
 }
 
+/* ---- Glass : base commune (polices DM, rayons, blur, fond transparent) -----
+   Polices : npm i @fontsource/dm-sans @fontsource/dm-mono (imports dans main.jsx)
+   Sélecteurs en :root[data-theme] (spécificité 0,2,0) pour primer sur les
+   alias de main.css chargé après ce fichier. */
+:root[data-theme='glass'],
+:root[data-theme='glass-dark'] {
+  --font-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --radius-card: 14px;
+  --radius-btn: 11px;
+  --glass-blur: blur(20px) saturate(160%);
+  --bg-app: transparent;
+}
+
+/* ---- Thème Glass (clair) -------------------------------------------------- */
+:root[data-theme='glass'] {
+  color-scheme: light;
+
+  --bg-main: #f3f5fb;
+  --bg-surface: rgba(255, 255, 255, 0.58);
+  --bg-surface-hover: rgba(255, 255, 255, 0.78);
+  --bg-sidebar: rgba(255, 255, 255, 0.58);
+  --bg-input: rgba(255, 255, 255, 0.60);
+  --page-bg:
+    radial-gradient(900px 520px at 8% -8%, rgba(129, 140, 248, 0.38), transparent 62%),
+    radial-gradient(800px 520px at 96% 4%, rgba(45, 212, 191, 0.30), transparent 62%),
+    radial-gradient(900px 620px at 55% 104%, rgba(192, 132, 252, 0.26), transparent 62%),
+    #f3f5fb;
+
+  --border-subtle: rgba(15, 23, 42, 0.09);
+  --border-hover: rgba(15, 23, 42, 0.20);
+
+  --accent-primary: #4338ca;
+  --accent-hover: #3730a3;
+  --accent-subtle: rgba(67, 56, 202, 0.10);
+  --accent-text: #ffffff;
+
+  --text-heading: #0f172a;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  --status-success: #059669;
+  --status-warning: #d97706;
+  --status-error: #dc2626;
+  --status-info: #2563eb;
+
+  --success-bg: rgba(5, 150, 105, 0.10);  --success-fg: #047857;  --success-bd: rgba(5, 150, 105, 0.30);
+  --warning-bg: rgba(217, 119, 6, 0.10);  --warning-fg: #b45309;  --warning-bd: rgba(217, 119, 6, 0.30);
+  --danger-bg:  rgba(220, 38, 38, 0.08);  --danger-fg:  #b91c1c;  --danger-bd:  rgba(220, 38, 38, 0.30);
+  --accent-bg:  rgba(67, 56, 202, 0.08);  --accent-fg:  #4338ca;  --accent-bd:  rgba(67, 56, 202, 0.30);
+  --teal-bg:    rgba(13, 148, 136, 0.10); --teal-fg:    #0f766e;  --teal-bd:    rgba(13, 148, 136, 0.30);
+  --info-bg:    rgba(37, 99, 235, 0.08);  --info-fg:    #1d4ed8;  --info-bd:    rgba(37, 99, 235, 0.30);
+  --neutral-bg: rgba(100, 116, 139, 0.10);--neutral-fg: #475569;  --neutral-bd: rgba(100, 116, 139, 0.30);
+
+  --shadow-panel: 0 10px 40px rgba(60, 72, 140, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --shadow-subtle: 0 1px 3px rgba(60, 72, 140, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --overlay: rgba(15, 23, 42, 0.45);
+  --scroll-thumb: rgba(15, 23, 42, 0.18);
+
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+}
+
+/* ---- Thème Glass Dark ----------------------------------------------------- */
+:root[data-theme='glass-dark'] {
+  color-scheme: dark;
+
+  --bg-main: #151b2f;
+  --bg-surface: rgba(255, 255, 255, 0.06);
+  --bg-surface-hover: rgba(255, 255, 255, 0.10);
+  --bg-sidebar: rgba(0, 0, 0, 0.18);
+  --bg-input: rgba(0, 0, 0, 0.25);
+  --page-bg:
+    radial-gradient(900px 520px at 8% -8%, rgba(99, 102, 241, 0.40), transparent 62%),
+    radial-gradient(800px 520px at 96% 4%, rgba(20, 184, 166, 0.26), transparent 62%),
+    radial-gradient(900px 620px at 55% 104%, rgba(168, 85, 247, 0.24), transparent 62%),
+    #151b2f;
+
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border-hover: rgba(255, 255, 255, 0.24);
+
+  --accent-primary: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-subtle: rgba(129, 140, 248, 0.16);
+  --accent-text: #0b1020;
+
+  --text-heading: #f4f6fc;
+  --text-primary: #e8ecf7;
+  --text-secondary: #a3aec6;
+  --text-muted: #7f8ba6;
+
+  --status-success: #10b981;
+  --status-warning: #f59e0b;
+  --status-error: #ef4444;
+  --status-info: #60a5fa;
+
+  --success-bg: rgba(16, 185, 129, 0.12);  --success-fg: #6ee7b7;  --success-bd: rgba(16, 185, 129, 0.35);
+  --warning-bg: rgba(245, 158, 11, 0.12);  --warning-fg: #fcd34d;  --warning-bd: rgba(245, 158, 11, 0.35);
+  --danger-bg:  rgba(239, 68, 68, 0.12);   --danger-fg:  #fca5a5;  --danger-bd:  rgba(239, 68, 68, 0.35);
+  --accent-bg:  rgba(129, 140, 248, 0.14); --accent-fg:  #a5b4fc;  --accent-bd:  rgba(129, 140, 248, 0.40);
+  --teal-bg:    rgba(20, 184, 166, 0.12);  --teal-fg:    #5eead4;  --teal-bd:    rgba(20, 184, 166, 0.35);
+  --info-bg:    rgba(96, 165, 250, 0.12);  --info-fg:    #93c5fd;  --info-bd:    rgba(96, 165, 250, 0.35);
+  --neutral-bg: rgba(163, 174, 198, 0.12); --neutral-fg: #a3aec6;  --neutral-bd: rgba(163, 174, 198, 0.30);
+
+  --shadow-panel: 0 10px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --overlay: rgba(5, 8, 20, 0.65);
+  --scroll-thumb: rgba(255, 255, 255, 0.14);
+
+  --gray-50: #1a2138;
+  --gray-100: #1f2740;
+  --gray-200: #2a3350;
+  --gray-300: #3a4566;
+  --gray-400: #6b7794;
+  --gray-500: #8590ab;
+  --gray-600: #a3aec6;
+  --gray-700: #b7c0d4;
+  --gray-800: #d3d9e8;
+  --gray-900: #f1f4fc;
+}
+
 /* ---- Reset ---------------------------------------------------------------- */
 *,
 *::before,
@@ -136,7 +273,8 @@ body {
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.5;
-  background-color: var(--bg-main);
+  background: var(--page-bg);
+  background-attachment: fixed;
   color: var(--text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;

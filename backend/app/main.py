@@ -5,7 +5,7 @@ import logging
 
 from app.config import get_settings
 from app.database import init_db
-from app.routes import auth, chat, conversations, providers, templates, projects, documents, rag_chat, integrations, agents, opeansearch, skills, hosts, exports, scheduler, notifications
+from app.routes import auth, chat, conversations, providers, templates, projects, documents, rag_chat, integrations, agents, opeansearch, skills, hosts, exports, scheduler, notifications, workflows
 
 # Configure logging
 logging.basicConfig(
@@ -22,7 +22,10 @@ app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.65",
     description="AgentRAG & Agent Multi-provider LLM Chat Application with Advanced Streaming & MCP Agent Skills",
-    debug=settings.DEBUG
+    debug=settings.DEBUG,
+    openapi_url="/api/openapi.json",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
 )
 
 # Configure CORS
@@ -95,6 +98,7 @@ app.include_router(hosts.router)
 app.include_router(exports.router)
 app.include_router(scheduler.router)
 app.include_router(notifications.router)
+app.include_router(workflows.router)
 
 # Global exception handler
 @app.exception_handler(Exception)

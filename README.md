@@ -1,7 +1,15 @@
 <img width="600" height="600" alt="agentragio" src="https://github.com/user-attachments/assets/93dfaf79-24a1-439b-9c63-724917a30554" />
 
 # AgentRAG.io
-**AgentRAG.io is a self-hosted, a RAG-Powered Intelligence, a MCP Integration, multi-provider platform featuring SSH & WinRM remote execution. It allows you to modularize your infrastructure and operational workflows by instantiating complex autonomous agents using a single file, scheduling basic task or Agent - with LLMJudge**
+**AgentRAG.io is a self-hosted, multi-provider platform for RAG-powered autonomous agents.**
+Define a complete agent in a single file, give it tools through MCP integrations (Git, Gitea, GitHub, SonarQube, SSH, WinRM, PSRP, DBConnector, Wiki.js and more), run it on demand or on a schedule, and chain agents into workflows. Results can be checked by an LLM judge.
+
+- **RAG tuned for code and docs**: semantic chunking (AST for Python, sections for Markdown), relevance-based chunk selection that cut the context sent to the LLM by about 75% in our tests, and a single embedding entry point you can switch between a general model (MiniLM) and a code model (Jina).
+- **Agents & MCP**: autonomous agents described in one file, with MCP tool servers and remote execution over SSH and WinRM.
+- **Scheduler & workflows**: recurring tasks and agents, and multi-step workflows, with run history and email notifications.
+- **Verification**: optional LLM-judge pass on answers and agent runs.
+- **Storage**: ChromaDB and OpenSearch vector stores, PostgreSQL, React UI.
+- **Deployment**: Docker image and Kubernetes Helm chart.
 
 ![License](https://img.shields.io/badge/MIT-00599C?style=for-the-badge&logo=MIT&logoColor=black)
 ![Python](https://img.shields.io/badge/Python-4EAA25?style=for-the-badge&logo=Python&logoColor=black)
@@ -14,14 +22,16 @@
 ![Agents](https://img.shields.io/badge/Agents-2ECC71?style=for-the-badge&logo=ChromaDB&logoColor=black)
 ![Scheduler](https://img.shields.io/badge/Scheduler-F39C12?style=for-the-badge&logo=ChromaDB&logoColor=black)
 ![LLMJudge](https://img.shields.io/badge/LLMJudge-v0.0.1-0078D6?style=for-the-badge&logo=ChromaDB&logoColor=black)
+![Workflow](https://img.shields.io/badge/Workflow-F39C12?style=for-the-badge&logo=ChromaDB&logoColor=black)
 ---
-[![Version](https://img.shields.io/badge/Version-v1.1.93-green?style=for-the-badge&logo=github)](http://gitea.aecoding.local:3000/kiki/AgentRAG.io/releases/tag/v1.1.93)
+[![Version](https://img.shields.io/badge/Version-v1.1.98-green?style=for-the-badge&logo=github)](https://github.com/iwebbo/AgentRAG.io/releases/tag/v1.1.98)
 ---
 
 ## Overview
 
-AgentRAG.io extends RAG.io with autonomous MCP agents that combine RAG intelligence with external tool execution. Built for enterprises and developers who need AI that acts, not just answers.
+AgentRAG.io extends RAG.io with autonomous MCP / Agents / Scheduler / Workflow that combine RAG intelligence with external tool execution. Built for enterprises and developers who need AI that acts, not just answers.
 
+- **Agent (Workflow)**: A workflow chains existing agents into a graph. Each node runs one of your agents; the output of one node can feed the next. The backend executes the graph and streams progress live.
 - **Answer verification (LLM judge)**: Every chat and RAG chat answer is checked before or after delivery: deterministic checks first (empty/truncated/looping output, `[SOURCE n]` citations, retrieval relevance, code via `ast` and `ruff`, JSON/YAML, expected schema), then an optional LLM judge that gets the sources and earlier findings as evidence and only blocks when confident. Three delivery modes: `off`, `annotate` (default: stream first, verdict after) and `gate` (buffer, verify, regenerate up to `VERIFY_MAX_ROUNDS` times, then deliver the best version). The verdict is returned as an SSE event and stored with the message.
 - **Scheduler**: Schedule existing agents (deterministic, fixed arguments) or simple LLM prompts on a cron-based frequency, with per-task approval modes (manual / auto / skip-all) and result delivery by in-app notification or email.
 - **Skill-Based Agents**: Instantiate any agent from a single .md file — define purpose, MCP servers, and RAG context in frontmatter YAML, register via API, run immediately.
@@ -108,6 +118,13 @@ MCP (Model Context Protocol) servers extend agent capabilities by providing stru
 > **Documenatation of Skill Agent** :
 
 [![Agent Skill](https://img.shields.io/badge/Documentation-Example_of_skill_md-blue?style=for-the-badge&logo=markdown)](doc/agents/skill_agent.md)
+
+## Workflows Agents
+A workflow chains existing agents into a graph. Each node runs one of your agents; the output of one node can feed the next. The backend executes the graph and streams progress live.
+
+> **Documenatation of Workflows Guide** :
+
+[![Workflows Badge](https://img.shields.io/badge/Documentation-Workflows-orange?style=for-the-badge&logo=markdown)](doc/workflows/workflows_guide.md)
 
 ---
 

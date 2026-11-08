@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir "torch>=2.0.0" --index-url https://download.pytorch.org/whl/cpu
 #
 RUN pip install --no-cache-dir \
     "fr-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_lg-3.7.0/fr_core_news_lg-3.7.0-py3-none-any.whl"
@@ -23,9 +23,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY ./app ./app
+COPY ./scripts ./scripts
+
+# Feature/embedding#131
+ARG BAKE_EMBEDDING_MODELS="sentence-transformers/all-MiniLM-L6-v2 jinaai/jina-embeddings-v2-base-code"
+ENV HF_HOME=/opt/hf \
+    TIKTOKEN_CACHE_DIR=/opt/tiktoken \
+    EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+RUN mkdir -p /opt/hf /opt/tiktoken \
+    && BAKE_EMBEDDING_MODELS="$BAKE_EMBEDDING_MODELS" python scripts/bake_embedding_models.py
 
 # Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app /opt/hf /opt/tiktoken
 USER appuser
 
 # Expose port
