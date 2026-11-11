@@ -218,6 +218,8 @@ docker run -d \
   -e VERIFY_JUDGE="auto" \
   -e VERIFY_MAX_ROUNDS="2" \
   -e RAG_MIN_SCORE="0.25" \
+  -e EMBEDDING_MODEL="jinaai/jina-embeddings-v2-base-code" \          # sentence-transformers/all-MiniLM-L6-v2 all-MiniLM-L6-v2 (défaut) | jinaai/jina-embeddings-v2-base-code
+  -e EMBEDDING_MAX_SEQ_LENGTH="1024" \    # optionnel ; défaut = min(model, 1024)
   ghcr.io/iwebbo/agentrag.io/backend:latest
 ```
 
